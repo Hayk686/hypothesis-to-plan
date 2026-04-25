@@ -40,6 +40,7 @@ function NewProjectPage() {
     title: "",
     hypothesis: "",
     domain: DOMAINS[0],
+    organism: "",
     budget: 50000,
     timelineWeeks: 12,
     resources: "",
@@ -55,6 +56,7 @@ function NewProjectPage() {
       title: DEMO_PROJECT.title,
       hypothesis: DEMO_PROJECT.hypothesis,
       domain: DEMO_PROJECT.domain,
+      organism: DEMO_PROJECT.organism,
       budget: DEMO_PROJECT.budget,
       timelineWeeks: DEMO_PROJECT.timelineWeeks,
       resources: DEMO_PROJECT.resources,
@@ -82,6 +84,7 @@ function NewProjectPage() {
       title: form.title,
       hypothesis: form.hypothesis,
       domain: form.domain,
+      organism: form.organism,
       budget: form.budget,
       timelineWeeks: form.timelineWeeks,
       resources: form.resources,
@@ -172,6 +175,16 @@ function NewProjectPage() {
                   onValueChange={([v]) => update("timelineWeeks", v)}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="organism">Target organism / system</Label>
+              <Input
+                id="organism"
+                placeholder="e.g. R6/2 mouse, E. coli BL21, HEK293T, A. thaliana"
+                value={form.organism}
+                onChange={(e) => update("organism", e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
