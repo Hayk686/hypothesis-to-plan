@@ -87,6 +87,7 @@ export const DEMO_PROJECT: Project = {
   hypothesis:
     "CRISPR-Cas13d targeting mutant HTT mRNA in striatal neurons will reduce mutant huntingtin protein by ≥70% without affecting wild-type allele expression in HD mouse model.",
   domain: "Neuroscience / Gene Therapy",
+  organism: "R6/2 transgenic mouse (Mus musculus)",
   budget: 85000,
   timelineWeeks: 16,
   resources: "BSL-2 lab, confocal microscope, qPCR, AAV production facility, R6/2 mouse colony",
