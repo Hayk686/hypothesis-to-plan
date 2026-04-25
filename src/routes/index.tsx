@@ -88,23 +88,30 @@ function LandingPage() {
                   hypothesis-to-plan / demo
                 </span>
               </div>
-              <div className="grid gap-4 p-6 text-left md:grid-cols-3">
+              <div className="grid gap-4 p-6 text-left md:grid-cols-4">
                 <div className="rounded-lg border border-border/60 bg-background/50 p-4">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground">Novelty</div>
-                  <div className="mt-1 font-display text-3xl font-semibold text-primary">78<span className="text-base text-muted-foreground">/100</span></div>
+                  <div className="mt-1 font-display text-3xl font-semibold text-primary">74<span className="text-base text-muted-foreground">/100</span></div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-gradient-hero" style={{ width: "78%" }} />
+                    <div className="h-full rounded-full bg-gradient-hero" style={{ width: "74%" }} />
                   </div>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-background/50 p-4">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Protocol</div>
-                  <div className="mt-1 font-display text-3xl font-semibold">7<span className="text-base text-muted-foreground"> steps</span></div>
-                  <div className="mt-2 text-xs text-muted-foreground">Design → Cloning → AAV → In vivo</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Feasibility</div>
+                  <div className="mt-1 font-display text-3xl font-semibold text-primary">82<span className="text-base text-muted-foreground">/100</span></div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-gradient-hero" style={{ width: "82%" }} />
+                  </div>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-background/50 p-4">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Budget</div>
-                  <div className="mt-1 font-display text-3xl font-semibold">$62k</div>
-                  <div className="mt-2 text-xs text-muted-foreground">14 line items · 16 weeks</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Cost</div>
+                  <div className="mt-1 font-display text-3xl font-semibold">$28k</div>
+                  <div className="mt-2 text-xs text-muted-foreground">17 line items</div>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-background/50 p-4">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Duration</div>
+                  <div className="mt-1 font-display text-3xl font-semibold">8 wks</div>
+                  <div className="mt-2 text-xs text-muted-foreground">6 protocol phases</div>
                 </div>
               </div>
             </Card>
@@ -178,10 +185,10 @@ function LandingPage() {
                 "{DEMO_PROJECT.hypothesis}"
               </p>
               <div className="mt-6 flex flex-wrap gap-2">
-                <Badge variant="secondary">Neuroscience</Badge>
-                <Badge variant="secondary">CRISPR-Cas13</Badge>
-                <Badge variant="secondary">Huntington's</Badge>
-                <Badge variant="secondary">In vivo</Badge>
+                <Badge variant="secondary">Immunology</Badge>
+                <Badge variant="secondary">CRISPRi</Badge>
+                <Badge variant="secondary">Intestinal organoids</Badge>
+                <Badge variant="secondary">IL6 / IBD</Badge>
               </div>
               <div className="mt-6 border-t border-border/60 pt-4">
                 <Link
