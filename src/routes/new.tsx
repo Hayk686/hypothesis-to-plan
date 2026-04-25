@@ -178,6 +178,16 @@ function NewProjectPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="organism">Target organism / system</Label>
+              <Input
+                id="organism"
+                placeholder="e.g. R6/2 mouse, E. coli BL21, HEK293T, A. thaliana"
+                value={form.organism}
+                onChange={(e) => update("organism", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label>Budget: <span className="font-mono text-primary">${form.budget.toLocaleString()}</span></Label>
               <Slider
                 value={[form.budget]}
