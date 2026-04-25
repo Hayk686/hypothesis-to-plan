@@ -67,6 +67,35 @@ function ProjectPage() {
   }
 
   const totalBudget = plan.materials.reduce((s, m) => s + m.total, 0);
+  const planText = formatPlanAsMarkdown(project, plan, totalBudget);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(planText);
+      setCopied(true);
+      toast.success("Plan copied to clipboard", {
+        description: `${planText.length.toLocaleString()} characters · structured Markdown`,
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Could not access clipboard", {
+        description: "Try the Download .md option instead.",
+      });
+    }
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([planText], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slugify(project.title)}-research-plan.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Plan downloaded", { description: a.download });
+  };
 
   return (
     <div className="min-h-screen">
@@ -77,14 +106,18 @@ function ProjectPage() {
           <Link to="/projects" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="mr-1 h-3 w-3" /> All projects
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button asChild variant="outline" size="sm">
               <Link to="/project/$id/present" params={{ id: project.id }}>
                 <Presentation className="mr-2 h-4 w-4" /> Judge view
               </Link>
             </Button>
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" /> Export plan
+            <Button variant="outline" size="sm" onClick={handleCopy}>
+              {copied ? <Check className="mr-2 h-4 w-4 text-success" /> : <Copy className="mr-2 h-4 w-4" />}
+              {copied ? "Copied" : "Copy plan"}
+            </Button>
+            <Button size="sm" onClick={handleDownload}>
+              <Download className="mr-2 h-4 w-4" /> Export .md
             </Button>
           </div>
         </div>
