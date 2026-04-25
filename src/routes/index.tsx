@@ -178,10 +178,10 @@ function LandingPage() {
                 "{DEMO_PROJECT.hypothesis}"
               </p>
               <div className="mt-6 flex flex-wrap gap-2">
-                <Badge variant="secondary">Neuroscience</Badge>
-                <Badge variant="secondary">CRISPR-Cas13</Badge>
-                <Badge variant="secondary">Huntington's</Badge>
-                <Badge variant="secondary">In vivo</Badge>
+                <Badge variant="secondary">Immunology</Badge>
+                <Badge variant="secondary">CRISPRi</Badge>
+                <Badge variant="secondary">Intestinal organoids</Badge>
+                <Badge variant="secondary">IL6 / IBD</Badge>
               </div>
               <div className="mt-6 border-t border-border/60 pt-4">
                 <Link
