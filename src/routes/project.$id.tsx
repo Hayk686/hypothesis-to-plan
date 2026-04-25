@@ -143,11 +143,11 @@ function ProjectPage() {
 
           {/* Top summary cards */}
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
-            <ScoreCard label="Novelty Score" value={plan.noveltyScore} />
-            <ScoreCard label="Feasibility Score" value={plan.feasibilityScore} />
-            <ScoreCard label="Evidence Confidence" value={plan.evidenceConfidence} />
-            <StatCard label="Estimated Cost" value={`$${(totalBudget / 1000).toFixed(1)}k`} />
-            <StatCard label="Estimated Duration" value={`${plan.timeline.length} wks`} />
+            <ScoreCard label="Novelty Score" value={plan.noveltyScore} helper="How original vs. published corpus" />
+            <ScoreCard label="Feasibility Score" value={plan.feasibilityScore} helper="Plan realism given budget & time" />
+            <ScoreCard label="Evidence Confidence" value={plan.evidenceConfidence} helper="Strength of supporting literature" />
+            <StatCard label="Estimated Cost" value={`$${(totalBudget / 1000).toFixed(1)}k`} helper={`${plan.materials.length} line items`} />
+            <StatCard label="Estimated Duration" value={`${plan.timeline.length} wks`} helper={`${plan.protocol.length} protocol phases`} />
           </div>
         </Card>
 
