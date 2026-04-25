@@ -117,7 +117,7 @@ function PresentPage() {
             <h2 className="font-display text-2xl font-semibold tracking-tight">Timeline</h2>
             <Badge variant="outline">{plan.timeline.length} weeks</Badge>
           </div>
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${plan.timeline.length}, minmax(0, 1fr))` }}>
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
             {plan.timeline.map((wk) => (
               <div key={wk.week} className="rounded-md border border-border/60 bg-background/50 p-2 text-center">
                 <div className="font-mono text-[10px] text-muted-foreground">W{wk.week}</div>
@@ -125,9 +125,9 @@ function PresentPage() {
               </div>
             ))}
           </div>
-          <ol className="mt-4 space-y-1 text-sm text-foreground/80">
+          <ol className="mt-4 space-y-1.5 text-sm text-foreground/80">
             {plan.timeline.map((wk) => (
-              <li key={wk.week} className="flex gap-2">
+              <li key={wk.week} className="flex flex-wrap gap-x-2 gap-y-0.5">
                 <span className="font-mono text-xs text-muted-foreground">W{wk.week}</span>
                 <span className="font-medium">{wk.milestone}</span>
                 <span className="text-muted-foreground">— {wk.deliverable}</span>
