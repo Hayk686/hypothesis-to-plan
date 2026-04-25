@@ -373,28 +373,30 @@ function ProjectPage() {
           <TabsContent value="timeline" className="mt-6 space-y-4">
             <SectionHeader title="Week-by-week timeline" subtitle={`${plan.timeline.length} weeks · ${new Set(plan.timeline.map((t) => t.phase)).size} phases`} />
             <div className="relative">
-              <div className="absolute bottom-0 left-6 top-0 w-0.5 bg-gradient-to-b from-primary via-primary/40 to-transparent" />
+              <div className="absolute bottom-0 left-5 top-2 hidden w-0.5 bg-gradient-to-b from-primary via-primary/40 to-transparent sm:block" />
               <div className="space-y-3">
                 {plan.timeline.map((wk) => (
-                  <Card key={wk.week} className="ml-12 border-border/60 bg-gradient-card p-4 transition-smooth hover:border-primary/40">
-                    <div className="absolute -ml-[3.4rem] flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-gradient-hero font-mono text-xs font-bold text-primary-foreground shadow-md">
+                  <div key={wk.week} className="relative sm:pl-14">
+                    <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-gradient-hero font-mono text-xs font-bold text-primary-foreground shadow-md sm:absolute sm:left-0 sm:top-0 sm:mb-0">
                       W{wk.week}
                     </div>
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <Badge variant="outline" className="text-xs">{wk.phase}</Badge>
-                      <h4 className="font-display font-semibold">{wk.milestone}</h4>
-                    </div>
-                    <ul className="mt-2 space-y-1 text-sm text-foreground/80">
-                      {wk.tasks.map((t) => (
-                        <li key={t} className="flex items-start gap-2">
-                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /> {t}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <span className="font-mono uppercase tracking-wider">Deliverable:</span> {wk.deliverable}
-                    </div>
-                  </Card>
+                    <Card className="border-border/60 bg-gradient-card p-4 transition-smooth hover:border-primary/40">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <Badge variant="outline" className="text-xs">{wk.phase}</Badge>
+                        <h4 className="font-display font-semibold">{wk.milestone}</h4>
+                      </div>
+                      <ul className="mt-2 space-y-1 text-sm text-foreground/80">
+                        {wk.tasks.map((t) => (
+                          <li key={t} className="flex items-start gap-2">
+                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /> {t}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <span className="font-mono uppercase tracking-wider">Deliverable:</span> {wk.deliverable}
+                      </div>
+                    </Card>
+                  </div>
                 ))}
               </div>
             </div>
