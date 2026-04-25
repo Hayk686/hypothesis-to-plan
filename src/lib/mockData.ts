@@ -3,6 +3,7 @@ export type Project = {
   title: string;
   hypothesis: string;
   domain: string;
+  organism: string;
   budget: number;
   timelineWeeks: number;
   resources: string;
