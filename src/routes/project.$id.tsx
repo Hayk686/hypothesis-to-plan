@@ -138,6 +138,22 @@ function ProjectPage() {
                 <Quote className="h-4 w-4 shrink-0 text-primary" />
                 <p className="text-sm italic text-foreground/80">{project.hypothesis}</p>
               </div>
+              {(project.resources || project.constraints) && (
+                <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                  {project.resources && (
+                    <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
+                      <span className="font-mono uppercase tracking-wider text-foreground/60">Resources</span>
+                      <div className="mt-0.5 text-foreground/75">{project.resources}</div>
+                    </div>
+                  )}
+                  {project.constraints && (
+                    <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
+                      <span className="font-mono uppercase tracking-wider text-foreground/60">Constraints</span>
+                      <div className="mt-0.5 text-foreground/75">{project.constraints}</div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
