@@ -10,9 +10,10 @@ import {
 import {
   ArrowLeft, ExternalLink, Sparkles, FileSearch, Beaker, ShoppingCart,
   Calendar, CheckCircle2, ShieldAlert, Download, Quote, Presentation,
-  Lightbulb, AlertCircle, Target,
+  Lightbulb, AlertCircle, Target, Copy, Check,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   getProject, generatePlan, type Project, type GeneratedPlan,
 } from "@/lib/mockData";
