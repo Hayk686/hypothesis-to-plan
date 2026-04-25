@@ -506,9 +506,9 @@ function ProjectPage() {
   );
 }
 
-function ScoreCard({ label, value }: { label: string; value: number }) {
+function ScoreCard({ label, value, helper }: { label: string; value: number; helper?: string }) {
   return (
-    <div className="rounded-lg border border-border/60 bg-primary/5 p-4">
+    <div className="rounded-lg border border-border/60 bg-primary/5 p-4" title={helper}>
       <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="mt-1 flex items-baseline gap-1">
         <div className="font-display text-2xl font-semibold text-primary">{value}</div>
@@ -517,15 +517,17 @@ function ScoreCard({ label, value }: { label: string; value: number }) {
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
         <div className="h-full rounded-full bg-gradient-hero transition-all" style={{ width: `${value}%` }} />
       </div>
+      {helper && <div className="mt-1.5 text-[10px] leading-tight text-muted-foreground">{helper}</div>}
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
     <div className="rounded-lg border border-border/60 bg-background/50 p-4">
       <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="mt-1 font-display text-2xl font-semibold">{value}</div>
+      {helper && <div className="mt-1.5 text-[10px] leading-tight text-muted-foreground">{helper}</div>}
     </div>
   );
 }
