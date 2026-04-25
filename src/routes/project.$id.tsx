@@ -66,6 +66,12 @@ function ProjectPage() {
   }
 
   const totalBudget = plan.materials.reduce((s, m) => s + m.total, 0);
+  // Feasibility: weighted by budget headroom, timeline realism, and high-impact risk count
+  const budgetRatio = Math.min(1, project.budget / Math.max(totalBudget, 1));
+  const highRisks = plan.risks.filter((r) => r.impact === "high").length;
+  const feasibilityScore = Math.round(
+    Math.max(35, Math.min(95, 50 + budgetRatio * 30 + (plan.timeline.length >= 8 ? 15 : 5) - highRisks * 4)),
+  );
 
   return (
     <div className="min-h-screen">
