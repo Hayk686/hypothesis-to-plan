@@ -100,11 +100,12 @@ function ProjectPage() {
           </div>
 
           {/* Stat strip */}
-          <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
             <StatCard label="Novelty" value={`${plan.noveltyScore}/100`} accent />
+            <StatCard label="Feasibility" value={`${feasibilityScore}/100`} accent />
             <StatCard label="Protocol steps" value={`${plan.protocol.length}`} />
-            <StatCard label="Estimated budget" value={`$${(totalBudget / 1000).toFixed(1)}k`} />
-            <StatCard label="Timeline" value={`${plan.timeline.length} weeks`} />
+            <StatCard label="Estimated cost" value={`$${(totalBudget / 1000).toFixed(1)}k`} />
+            <StatCard label="Duration" value={`${plan.timeline.length} wks`} />
           </div>
         </Card>
 
