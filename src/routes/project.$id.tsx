@@ -138,16 +138,32 @@ function ProjectPage() {
                 <Quote className="h-4 w-4 shrink-0 text-primary" />
                 <p className="text-sm italic text-foreground/80">{project.hypothesis}</p>
               </div>
+              {(project.resources || project.constraints) && (
+                <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                  {project.resources && (
+                    <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
+                      <span className="font-mono uppercase tracking-wider text-foreground/60">Resources</span>
+                      <div className="mt-0.5 text-foreground/75">{project.resources}</div>
+                    </div>
+                  )}
+                  {project.constraints && (
+                    <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
+                      <span className="font-mono uppercase tracking-wider text-foreground/60">Constraints</span>
+                      <div className="mt-0.5 text-foreground/75">{project.constraints}</div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Top summary cards */}
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
-            <ScoreCard label="Novelty Score" value={plan.noveltyScore} />
-            <ScoreCard label="Feasibility Score" value={plan.feasibilityScore} />
-            <ScoreCard label="Evidence Confidence" value={plan.evidenceConfidence} />
-            <StatCard label="Estimated Cost" value={`$${(totalBudget / 1000).toFixed(1)}k`} />
-            <StatCard label="Estimated Duration" value={`${plan.timeline.length} wks`} />
+            <ScoreCard label="Novelty Score" value={plan.noveltyScore} helper="How original vs. published corpus" />
+            <ScoreCard label="Feasibility Score" value={plan.feasibilityScore} helper="Plan realism given budget & time" />
+            <ScoreCard label="Evidence Confidence" value={plan.evidenceConfidence} helper="Strength of supporting literature" />
+            <StatCard label="Estimated Cost" value={`$${(totalBudget / 1000).toFixed(1)}k`} helper={`${plan.materials.length} line items`} />
+            <StatCard label="Estimated Duration" value={`${plan.timeline.length} wks`} helper={`${plan.protocol.length} protocol phases`} />
           </div>
         </Card>
 
@@ -373,28 +389,30 @@ function ProjectPage() {
           <TabsContent value="timeline" className="mt-6 space-y-4">
             <SectionHeader title="Week-by-week timeline" subtitle={`${plan.timeline.length} weeks · ${new Set(plan.timeline.map((t) => t.phase)).size} phases`} />
             <div className="relative">
-              <div className="absolute bottom-0 left-6 top-0 w-0.5 bg-gradient-to-b from-primary via-primary/40 to-transparent" />
+              <div className="absolute bottom-0 left-5 top-2 hidden w-0.5 bg-gradient-to-b from-primary via-primary/40 to-transparent sm:block" />
               <div className="space-y-3">
                 {plan.timeline.map((wk) => (
-                  <Card key={wk.week} className="ml-12 border-border/60 bg-gradient-card p-4 transition-smooth hover:border-primary/40">
-                    <div className="absolute -ml-[3.4rem] flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-gradient-hero font-mono text-xs font-bold text-primary-foreground shadow-md">
+                  <div key={wk.week} className="relative sm:pl-14">
+                    <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-gradient-hero font-mono text-xs font-bold text-primary-foreground shadow-md sm:absolute sm:left-0 sm:top-0 sm:mb-0">
                       W{wk.week}
                     </div>
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <Badge variant="outline" className="text-xs">{wk.phase}</Badge>
-                      <h4 className="font-display font-semibold">{wk.milestone}</h4>
-                    </div>
-                    <ul className="mt-2 space-y-1 text-sm text-foreground/80">
-                      {wk.tasks.map((t) => (
-                        <li key={t} className="flex items-start gap-2">
-                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /> {t}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <span className="font-mono uppercase tracking-wider">Deliverable:</span> {wk.deliverable}
-                    </div>
-                  </Card>
+                    <Card className="border-border/60 bg-gradient-card p-4 transition-smooth hover:border-primary/40">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <Badge variant="outline" className="text-xs">{wk.phase}</Badge>
+                        <h4 className="font-display font-semibold">{wk.milestone}</h4>
+                      </div>
+                      <ul className="mt-2 space-y-1 text-sm text-foreground/80">
+                        {wk.tasks.map((t) => (
+                          <li key={t} className="flex items-start gap-2">
+                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" /> {t}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <span className="font-mono uppercase tracking-wider">Deliverable:</span> {wk.deliverable}
+                      </div>
+                    </Card>
+                  </div>
                 ))}
               </div>
             </div>
@@ -504,9 +522,9 @@ function ProjectPage() {
   );
 }
 
-function ScoreCard({ label, value }: { label: string; value: number }) {
+function ScoreCard({ label, value, helper }: { label: string; value: number; helper?: string }) {
   return (
-    <div className="rounded-lg border border-border/60 bg-primary/5 p-4">
+    <div className="rounded-lg border border-border/60 bg-primary/5 p-4" title={helper}>
       <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="mt-1 flex items-baseline gap-1">
         <div className="font-display text-2xl font-semibold text-primary">{value}</div>
@@ -515,15 +533,17 @@ function ScoreCard({ label, value }: { label: string; value: number }) {
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
         <div className="h-full rounded-full bg-gradient-hero transition-all" style={{ width: `${value}%` }} />
       </div>
+      {helper && <div className="mt-1.5 text-[10px] leading-tight text-muted-foreground">{helper}</div>}
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
     <div className="rounded-lg border border-border/60 bg-background/50 p-4">
       <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="mt-1 font-display text-2xl font-semibold">{value}</div>
+      {helper && <div className="mt-1.5 text-[10px] leading-tight text-muted-foreground">{helper}</div>}
     </div>
   );
 }
