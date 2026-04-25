@@ -46,8 +46,24 @@ function ProjectsPage() {
         </div>
 
         {projects.length === 0 ? (
-          <Card className="p-12 text-center">
-            <p className="text-muted-foreground">No projects yet.</p>
+          <Card className="border-dashed border-border/80 bg-gradient-card p-12 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <h3 className="font-display text-xl font-semibold">No projects yet</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Start by entering a hypothesis or open the preloaded demo to see what a finished plan looks like.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              <Button asChild className="bg-gradient-hero shadow-glow">
+                <Link to="/new"><Plus className="mr-2 h-4 w-4" />New project</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/project/$id" params={{ id: DEMO_PROJECT.id }}>
+                  <Sparkles className="mr-2 h-4 w-4" /> Open demo
+                </Link>
+              </Button>
+            </div>
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
