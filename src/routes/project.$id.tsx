@@ -42,6 +42,7 @@ function ProjectPage() {
   const { id } = Route.useParams();
   const [project, setProject] = useState<Project | null>(null);
   const [plan, setPlan] = useState<GeneratedPlan | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const p = getProject(id);
