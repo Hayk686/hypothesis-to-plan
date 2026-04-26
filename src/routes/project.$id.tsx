@@ -731,6 +731,7 @@ function JudgeViewOverlay({
   project,
   plan,
   totalBudget,
+  labReadiness,
   copied,
   onCopy,
   onClose,
@@ -738,6 +739,7 @@ function JudgeViewOverlay({
   project: Project;
   plan: GeneratedPlan;
   totalBudget: number;
+  labReadiness: import("@/lib/labReadiness").LabReadinessReport;
   copied: boolean;
   onCopy: () => void;
   onClose: () => void;
