@@ -30,13 +30,13 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Hypothesis→Plan — AI Research Co-Scientist" },
+      { title: "Hypothesis-TO-Plan" },
       {
         name: "description",
         content:
           "Turn a raw scientific hypothesis into a complete experimental plan: novelty scoring, related work, protocols, budgets, timelines, validation, and risk analysis.",
       },
-      { property: "og:title", content: "Hypothesis→Plan — AI Research Co-Scientist" },
+      { property: "og:title", content: "Hypothesis-TO-Plan" },
       {
         property: "og:description",
         content: "Generate a full experimental plan from a single hypothesis in seconds.",
@@ -47,6 +47,12 @@ export const Route = createRootRoute({
         rel: "preconnect",
         href: "https://fonts.googleapis.com",
       },
+      { name: "twitter:title", content: "Hypothesis-TO-Plan" },
+      { name: "description", content: "An AI research co-scientist that transforms scientific hypotheses into comprehensive experimental plans." },
+      { property: "og:description", content: "An AI research co-scientist that transforms scientific hypotheses into comprehensive experimental plans." },
+      { name: "twitter:description", content: "An AI research co-scientist that transforms scientific hypotheses into comprehensive experimental plans." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4aa65eae-2e43-4022-a67b-ff9dc201894d/id-preview-cc7538eb--b3c8866d-8f27-4982-b3f0-12ddd96eaf70.lovable.app-1777180956151.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4aa65eae-2e43-4022-a67b-ff9dc201894d/id-preview-cc7538eb--b3c8866d-8f27-4982-b3f0-12ddd96eaf70.lovable.app-1777180956151.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
