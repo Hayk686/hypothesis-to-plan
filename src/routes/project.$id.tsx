@@ -57,6 +57,7 @@ function ProjectPage() {
   const [paperSource, setPaperSource] = useState<DataSource>("seed");
   const [paperSourceNote, setPaperSourceNote] = useState<string>("");
   const [literatureLoading, setLiteratureLoading] = useState(false);
+  const [literatureDebug, setLiteratureDebug] = useState<LiteratureDebug | null>(null);
 
   useEffect(() => {
     const p = getProject(id);
