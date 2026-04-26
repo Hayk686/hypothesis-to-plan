@@ -302,29 +302,42 @@ export const Route = createFileRoute("/api/generate-plan")({
         };
 
         // ----- Per-source status (for the UI panel) -----
+        const lastProtoAttempt = protoDebug.attempts[protoDebug.attempts.length - 1];
+        const protoStatusCode = lastProtoAttempt?.status_code ?? protoDebug.protocolsIoStatus ?? 0;
+        const protoErrorMsg = protoDebug.errors[0] ?? lastProtoAttempt?.error_message ?? null;
+
         const source_status = {
           literature: {
             label: usedFallback.literature ? "Curated fallback" : "Live Semantic Scholar",
             ok: !usedFallback.literature,
+            coverage: usedFallback.literature ? "fallback" : "full",
             reason: usedFallback.literature
               ? `Fewer than 3 relevant papers after ${litDebug.attempts.length} query variant${litDebug.attempts.length === 1 ? "" : "s"}.`
-              : `${papers.length} papers via ${litDebug.source}.`,
+              : `Returned ${papers.length} papers via Semantic Scholar.`,
           },
           protocols: {
             label: usedFallback.protocols ? "Curated fallback" : "Live protocols.io",
             ok: !usedFallback.protocols,
+            coverage: usedFallback.protocols ? "partial" : "full",
             reason: usedFallback.protocols
-              ? protoDebug.errors[0]
-                ? `protocols.io error: ${protoDebug.errors[0]}`
-                : "protocols.io returned zero usable protocols."
+              ? `protocols.io HTTP ${protoStatusCode || "—"}${protoErrorMsg ? ` · ${protoErrorMsg}` : ""}`
               : `${protocols.length} protocols from protocols.io.`,
           },
           materials: {
-            label: "Verified supplier registry",
-            ok: matDebug.matchedCount > 0,
+            label: matDebug.unmatchedCount > 0
+              ? "Verified registry (partial)"
+              : "Verified supplier registry",
+            ok: matDebug.matchedCount > 0 && matDebug.unmatchedCount === 0,
+            coverage:
+              matDebug.matchedCount === 0
+                ? "fallback"
+                : matDebug.unmatchedCount > 0
+                  ? "partial"
+                  : "full",
             reason: `${matDebug.matchedCount} matched / ${matDebug.unmatchedCount} unverified (registry size ${matDebug.registrySize}).`,
           },
         };
+
 
         const debug = {
           orchestrator: { evidenceWeak, usedFallback },
