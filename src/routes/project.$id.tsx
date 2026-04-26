@@ -167,6 +167,15 @@ function ProjectPage() {
             <StatCard label="Estimated Cost" value={`$${(totalBudget / 1000).toFixed(1)}k`} helper={`${plan.materials.length} line items`} />
             <StatCard label="Estimated Duration" value={`${plan.timeline.length} wks`} helper={`${plan.protocol.length} protocol phases`} />
           </div>
+
+          {/* Verification banner */}
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
+            <VerificationBadge verification={{ status: "pending" }} />
+            <span className="text-foreground/80">
+              Demo data is seeded for layout — every literature reference, protocol source, and catalog number is marked
+              <span className="font-mono"> pending verification</span> until a real source is attached.
+            </span>
+          </div>
         </Card>
 
         {/* Tabs */}
