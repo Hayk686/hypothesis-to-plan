@@ -315,7 +315,10 @@ function ProjectPage() {
                   </div>
                 </div>
               </Card>
-            ))}
+                  ))}
+                </>
+              );
+            })()}
           </TabsContent>
 
           {/* NOVELTY */}
