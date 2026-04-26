@@ -86,11 +86,28 @@ function ProjectPage() {
       setPaperSource(res.source);
       setPaperSourceNote(res.note ?? "");
       setLiteratureDebug(res.debug ?? null);
-      if (res.source === "live-api") {
-        toast.success("Refreshed from Semantic Scholar");
+
+      // Provenance-aware toast: only claim "fallback" when literature is
+      // actually fallback AND no live papers are available from any source
+      // (this refresh OR the orchestrator's livePlan).
+      const liveCount = res.source === "live-api" ? res.data.length : 0;
+      const livePlanLitOk =
+        livePlan?.source_status?.literature?.used_fallback === false &&
+        (livePlan?.papers?.length ?? 0) > 0;
+
+      if (res.source === "live-api" && liveCount > 0) {
+        toast.success("Live literature loaded", {
+          description: `Returned ${liveCount} paper${liveCount === 1 ? "" : "s"} via Semantic Scholar.`,
+        });
+      } else if (livePlanLitOk) {
+        // Refresh fell back, but the orchestrator already has live papers —
+        // do not contradict that with a fallback toast.
+        toast.message("Live literature already loaded", {
+          description: `Pipeline returned ${livePlan!.papers.length} papers via Semantic Scholar.`,
+        });
       } else {
         toast.message("Using verified seeded fallback", {
-          description: res.note,
+          description: res.note ?? "Live Semantic Scholar unavailable.",
         });
       }
     } catch {
@@ -100,7 +117,14 @@ function ProjectPage() {
       setPaperSource("fallback");
       setPaperSourceNote("Verified seeded fallback — live API unavailable.");
       setLiteratureDebug(null);
-      toast.message("Using verified seeded fallback");
+      const livePlanLitOk =
+        livePlan?.source_status?.literature?.used_fallback === false &&
+        (livePlan?.papers?.length ?? 0) > 0;
+      if (!livePlanLitOk) {
+        toast.message("Using verified seeded fallback", {
+          description: "Live Semantic Scholar request failed.",
+        });
+      }
     } finally {
       setLiteratureLoading(false);
     }
