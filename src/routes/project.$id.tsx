@@ -16,8 +16,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   getProject, generatePlan, CATALOG_VERIFY_REQUIRED,
-  type Project, type GeneratedPlan,
+  type Project, type GeneratedPlan, type Paper,
 } from "@/lib/mockData";
+import { searchLiterature, type DataSource } from "@/lib/services";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { TechStackPanel } from "@/components/TechStackPanel";
 
@@ -49,11 +50,42 @@ function ProjectPage() {
   const [showJudgeView, setShowJudgeView] = useState(false);
   const [pitchCopied, setPitchCopied] = useState(false);
 
+  const [livePapers, setLivePapers] = useState<Paper[] | null>(null);
+  const [paperSource, setPaperSource] = useState<DataSource>("seed");
+  const [paperSourceNote, setPaperSourceNote] = useState<string>("");
+  const [literatureLoading, setLiteratureLoading] = useState(false);
+
   useEffect(() => {
     const p = getProject(id);
     if (!p) throw notFound();
     setProject(p);
-    setPlan(generatePlan(p));
+    const generated = generatePlan(p);
+    setPlan(generated);
+
+    // Try live Semantic Scholar; fall back to seeded papers on any failure.
+    let cancelled = false;
+    setLiteratureLoading(true);
+    const query =
+      `${p.hypothesis} ${p.domain} ${p.organism}`.trim() || p.title;
+    searchLiterature(query)
+      .then((res) => {
+        if (cancelled) return;
+        setLivePapers(res.data);
+        setPaperSource(res.source);
+        setPaperSourceNote(res.note ?? "");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLivePapers(generated.papers);
+        setPaperSource("fallback");
+        setPaperSourceNote("Verified seeded fallback — live API unavailable.");
+      })
+      .finally(() => {
+        if (!cancelled) setLiteratureLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   if (!project || !plan) {
@@ -205,11 +237,33 @@ function ProjectPage() {
 
           {/* EVIDENCE */}
           <TabsContent value="evidence" className="mt-6 space-y-4">
-            <SectionHeader
-              title="Related work"
-              subtitle={`${plan.papers.length} papers from Semantic Scholar (mock) ranked by relevance`}
-            />
-            {plan.papers.map((paper) => (
+            {(() => {
+              const displayPapers = livePapers ?? plan.papers;
+              const sourceLabel =
+                paperSource === "live-api"
+                  ? "Live Semantic Scholar"
+                  : paperSource === "fallback"
+                    ? "Verified seeded fallback"
+                    : "Verified seeded data";
+              const sourceClass =
+                paperSource === "live-api"
+                  ? "border-success/40 bg-success/10 text-success"
+                  : "border-warning/40 bg-warning/10 text-warning-foreground";
+              return (
+                <>
+                  <SectionHeader
+                    title="Related work"
+                    subtitle={`${displayPapers.length} papers ranked by relevance`}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className={`text-[10px] uppercase tracking-wider ${sourceClass}`}>
+                      {literatureLoading ? "Querying Semantic Scholar…" : sourceLabel}
+                    </Badge>
+                    {paperSourceNote && (
+                      <span className="text-xs text-muted-foreground">{paperSourceNote}</span>
+                    )}
+                  </div>
+                  {displayPapers.map((paper) => (
               <Card key={paper.id} className="border-border/60 bg-gradient-card p-5 transition-smooth hover:border-primary/40">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -261,7 +315,10 @@ function ProjectPage() {
                   </div>
                 </div>
               </Card>
-            ))}
+                  ))}
+                </>
+              );
+            })()}
           </TabsContent>
 
           {/* NOVELTY */}
