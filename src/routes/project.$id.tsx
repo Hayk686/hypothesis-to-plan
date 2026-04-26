@@ -899,6 +899,8 @@ function JudgeViewOverlay({
           </ul>
         </Card>
 
+        <LabReadinessCard report={labReadiness} variant="full" />
+
         <TechStackPanel variant="compact" />
 
         <div className="flex flex-wrap items-center justify-center gap-3 pb-6">
