@@ -13,7 +13,11 @@ import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectIdRouteImport } from './routes/project.$id'
+import { Route as ApiSearchProtocolsRouteImport } from './routes/api.search-protocols'
 import { Route as ApiSearchPapersRouteImport } from './routes/api.search-papers'
+import { Route as ApiSearchLiteratureRouteImport } from './routes/api.search-literature'
+import { Route as ApiResolveMaterialsRouteImport } from './routes/api.resolve-materials'
+import { Route as ApiGeneratePlanRouteImport } from './routes/api.generate-plan'
 import { Route as ProjectIdPresentRouteImport } from './routes/project.$id.present'
 
 const ProjectsRoute = ProjectsRouteImport.update({
@@ -36,9 +40,29 @@ const ProjectIdRoute = ProjectIdRouteImport.update({
   path: '/project/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSearchProtocolsRoute = ApiSearchProtocolsRouteImport.update({
+  id: '/api/search-protocols',
+  path: '/api/search-protocols',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSearchPapersRoute = ApiSearchPapersRouteImport.update({
   id: '/api/search-papers',
   path: '/api/search-papers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSearchLiteratureRoute = ApiSearchLiteratureRouteImport.update({
+  id: '/api/search-literature',
+  path: '/api/search-literature',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiResolveMaterialsRoute = ApiResolveMaterialsRouteImport.update({
+  id: '/api/resolve-materials',
+  path: '/api/resolve-materials',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGeneratePlanRoute = ApiGeneratePlanRouteImport.update({
+  id: '/api/generate-plan',
+  path: '/api/generate-plan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectIdPresentRoute = ProjectIdPresentRouteImport.update({
@@ -51,7 +75,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/projects': typeof ProjectsRoute
+  '/api/generate-plan': typeof ApiGeneratePlanRoute
+  '/api/resolve-materials': typeof ApiResolveMaterialsRoute
+  '/api/search-literature': typeof ApiSearchLiteratureRoute
   '/api/search-papers': typeof ApiSearchPapersRoute
+  '/api/search-protocols': typeof ApiSearchProtocolsRoute
   '/project/$id': typeof ProjectIdRouteWithChildren
   '/project/$id/present': typeof ProjectIdPresentRoute
 }
@@ -59,7 +87,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/projects': typeof ProjectsRoute
+  '/api/generate-plan': typeof ApiGeneratePlanRoute
+  '/api/resolve-materials': typeof ApiResolveMaterialsRoute
+  '/api/search-literature': typeof ApiSearchLiteratureRoute
   '/api/search-papers': typeof ApiSearchPapersRoute
+  '/api/search-protocols': typeof ApiSearchProtocolsRoute
   '/project/$id': typeof ProjectIdRouteWithChildren
   '/project/$id/present': typeof ProjectIdPresentRoute
 }
@@ -68,7 +100,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/projects': typeof ProjectsRoute
+  '/api/generate-plan': typeof ApiGeneratePlanRoute
+  '/api/resolve-materials': typeof ApiResolveMaterialsRoute
+  '/api/search-literature': typeof ApiSearchLiteratureRoute
   '/api/search-papers': typeof ApiSearchPapersRoute
+  '/api/search-protocols': typeof ApiSearchProtocolsRoute
   '/project/$id': typeof ProjectIdRouteWithChildren
   '/project/$id/present': typeof ProjectIdPresentRoute
 }
@@ -78,7 +114,11 @@ export interface FileRouteTypes {
     | '/'
     | '/new'
     | '/projects'
+    | '/api/generate-plan'
+    | '/api/resolve-materials'
+    | '/api/search-literature'
     | '/api/search-papers'
+    | '/api/search-protocols'
     | '/project/$id'
     | '/project/$id/present'
   fileRoutesByTo: FileRoutesByTo
@@ -86,7 +126,11 @@ export interface FileRouteTypes {
     | '/'
     | '/new'
     | '/projects'
+    | '/api/generate-plan'
+    | '/api/resolve-materials'
+    | '/api/search-literature'
     | '/api/search-papers'
+    | '/api/search-protocols'
     | '/project/$id'
     | '/project/$id/present'
   id:
@@ -94,7 +138,11 @@ export interface FileRouteTypes {
     | '/'
     | '/new'
     | '/projects'
+    | '/api/generate-plan'
+    | '/api/resolve-materials'
+    | '/api/search-literature'
     | '/api/search-papers'
+    | '/api/search-protocols'
     | '/project/$id'
     | '/project/$id/present'
   fileRoutesById: FileRoutesById
@@ -103,7 +151,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NewRoute: typeof NewRoute
   ProjectsRoute: typeof ProjectsRoute
+  ApiGeneratePlanRoute: typeof ApiGeneratePlanRoute
+  ApiResolveMaterialsRoute: typeof ApiResolveMaterialsRoute
+  ApiSearchLiteratureRoute: typeof ApiSearchLiteratureRoute
   ApiSearchPapersRoute: typeof ApiSearchPapersRoute
+  ApiSearchProtocolsRoute: typeof ApiSearchProtocolsRoute
   ProjectIdRoute: typeof ProjectIdRouteWithChildren
 }
 
@@ -137,11 +189,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/search-protocols': {
+      id: '/api/search-protocols'
+      path: '/api/search-protocols'
+      fullPath: '/api/search-protocols'
+      preLoaderRoute: typeof ApiSearchProtocolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/search-papers': {
       id: '/api/search-papers'
       path: '/api/search-papers'
       fullPath: '/api/search-papers'
       preLoaderRoute: typeof ApiSearchPapersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/search-literature': {
+      id: '/api/search-literature'
+      path: '/api/search-literature'
+      fullPath: '/api/search-literature'
+      preLoaderRoute: typeof ApiSearchLiteratureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/resolve-materials': {
+      id: '/api/resolve-materials'
+      path: '/api/resolve-materials'
+      fullPath: '/api/resolve-materials'
+      preLoaderRoute: typeof ApiResolveMaterialsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/generate-plan': {
+      id: '/api/generate-plan'
+      path: '/api/generate-plan'
+      fullPath: '/api/generate-plan'
+      preLoaderRoute: typeof ApiGeneratePlanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/project/$id/present': {
@@ -170,7 +250,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NewRoute: NewRoute,
   ProjectsRoute: ProjectsRoute,
+  ApiGeneratePlanRoute: ApiGeneratePlanRoute,
+  ApiResolveMaterialsRoute: ApiResolveMaterialsRoute,
+  ApiSearchLiteratureRoute: ApiSearchLiteratureRoute,
   ApiSearchPapersRoute: ApiSearchPapersRoute,
+  ApiSearchProtocolsRoute: ApiSearchProtocolsRoute,
   ProjectIdRoute: ProjectIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
