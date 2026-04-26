@@ -51,8 +51,8 @@ export const Route = createRootRoute({
       { name: "description", content: "An AI research co-scientist that transforms scientific hypotheses into comprehensive experimental plans." },
       { property: "og:description", content: "An AI research co-scientist that transforms scientific hypotheses into comprehensive experimental plans." },
       { name: "twitter:description", content: "An AI research co-scientist that transforms scientific hypotheses into comprehensive experimental plans." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4aa65eae-2e43-4022-a67b-ff9dc201894d/id-preview-cc7538eb--b3c8866d-8f27-4982-b3f0-12ddd96eaf70.lovable.app-1777180956151.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4aa65eae-2e43-4022-a67b-ff9dc201894d/id-preview-cc7538eb--b3c8866d-8f27-4982-b3f0-12ddd96eaf70.lovable.app-1777180956151.png" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/75868b87-363d-4f95-92d9-9a013f8dabdf/id-preview-1a1eb6fe--b3c8866d-8f27-4982-b3f0-12ddd96eaf70.lovable.app-1777179901251.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/75868b87-363d-4f95-92d9-9a013f8dabdf/id-preview-1a1eb6fe--b3c8866d-8f27-4982-b3f0-12ddd96eaf70.lovable.app-1777179901251.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
