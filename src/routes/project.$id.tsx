@@ -114,6 +114,7 @@ function ProjectPage() {
   }
 
   const totalBudget = plan.materials.reduce((s, m) => s + m.total, 0);
+  const labReadiness = computeLabReadiness(plan, plan.literatureQc);
   const planText = formatPlanAsMarkdown(project, plan, totalBudget);
 
   const handleCopy = async () => {
