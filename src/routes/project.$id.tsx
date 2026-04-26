@@ -310,6 +310,46 @@ function ProjectPage() {
 
           {/* EVIDENCE */}
           <TabsContent value="evidence" className="mt-6 space-y-4">
+            {livePlan && livePlan.evidence_map.length > 0 && (
+              <Card className="border-success/30 bg-success/5 p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FileSearch className="h-4 w-4 text-success" />
+                    <h3 className="font-display text-sm font-semibold">Live evidence ({livePlan.evidence_map.length})</h3>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <SourceBadge source="live-semantic-scholar" />
+                    {livePlan.evidence_map.some((e) => e.source === "pubmed") && <SourceBadge source="pubmed" />}
+                    {livePlan.warnings.uses_fallback_literature && <SourceBadge source="curated-fallback" fallback />}
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {livePlan.evidence_map.slice(0, 6).map((e) => (
+                    <a
+                      key={e.id}
+                      href={e.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md border border-border/60 bg-background/60 p-2 hover:border-primary/40"
+                    >
+                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <span className="font-mono">{e.role}</span>
+                        <span>·</span>
+                        <span>{e.year || "—"}</span>
+                        <span>·</span>
+                        <span>{Math.round(e.relevance_score * 100)}% rel.</span>
+                      </div>
+                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-snug">{e.title}</div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">{e.venue}</div>
+                    </a>
+                  ))}
+                </div>
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  <span className="font-mono">Literature QC:</span>{" "}
+                  <span className="text-foreground/80">{livePlan.literature_qc.result}</span> — {livePlan.literature_qc.reason}
+                </div>
+              </Card>
+            )}
             {(() => {
               const displayPapers = livePapers ?? plan.papers;
               const isRateLimited = /rate limit/i.test(paperSourceNote);
