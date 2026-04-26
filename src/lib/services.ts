@@ -122,32 +122,30 @@ export async function searchLiterature(
   }
 
   try {
-    const url = `${S2_ENDPOINT}?query=${encodeURIComponent(trimmed)}&limit=10&fields=${S2_FIELDS}`;
-    const headers: Record<string, string> = { Accept: "application/json" };
-    const apiKey =
-      typeof import.meta !== "undefined"
-        ? (import.meta as unknown as { env?: Record<string, string> }).env
-            ?.VITE_SEMANTIC_SCHOLAR_API_KEY
-        : undefined;
-    if (apiKey) headers["x-api-key"] = apiKey;
-
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(url, { headers, signal: controller.signal });
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const res = await fetch(PROXY_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ query: trimmed }),
+      signal: controller.signal,
+    });
     clearTimeout(timeoutId);
 
     if (res.status === 429) throw new Error("Rate limited (HTTP 429)");
-    if (!res.ok) throw new Error(`S2 HTTP ${res.status}`);
-    const json = (await res.json()) as S2Response;
-    const items = (json.data ?? []).filter((p) => p.title);
-    if (!items.length) throw new Error("S2 returned no papers");
+    if (res.status === 403) throw new Error("Forbidden (HTTP 403)");
+    if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
+
+    const json = (await res.json()) as { data?: S2Paper[]; usedApiKey?: boolean };
+    const items = (json.data ?? []).filter((p) => p && p.title);
+    if (!items.length) throw new Error("No papers returned");
 
     return {
       data: items.slice(0, 6).map(s2ToPaper),
       source: "live-api",
-      note: apiKey
-        ? "Live Semantic Scholar (with API key)."
-        : "Live Semantic Scholar (public, keyless).",
+      note: json.usedApiKey
+        ? "Live Semantic Scholar (server proxy, with API key)."
+        : "Live Semantic Scholar (server proxy, keyless).",
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "live API unavailable";
@@ -156,8 +154,8 @@ export async function searchLiterature(
       data: DEMO_PLAN.papers,
       source: "fallback",
       note: isRateLimited
-        ? "Rate limited — using verified seeded fallback."
-        : `Verified seeded fallback — ${msg}.`,
+        ? "Rate limited — using verified source-backed fallback."
+        : `Verified source-backed fallback — ${msg}.`,
     };
   }
 }
