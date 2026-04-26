@@ -139,6 +139,7 @@ export async function searchLiterature(
     const res = await fetch(url, { headers, signal: controller.signal });
     clearTimeout(timeoutId);
 
+    if (res.status === 429) throw new Error("Rate limited (HTTP 429)");
     if (!res.ok) throw new Error(`S2 HTTP ${res.status}`);
     const json = (await res.json()) as S2Response;
     const items = (json.data ?? []).filter((p) => p.title);
