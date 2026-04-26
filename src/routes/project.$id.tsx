@@ -1001,6 +1001,13 @@ function slugify(s: string) {
     .slice(0, 60) || "research-plan";
 }
 
+function deriveExperimentType(project: Project): string {
+  const organism = project.organism?.split(/[(,]/)[0]?.trim();
+  const domain = project.domain?.split(/[/,]/)[0]?.trim();
+  if (organism && domain) return `${organism} · ${domain}`;
+  return organism || domain || project.title;
+}
+
 function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget: number): string {
   const L: string[] = [];
   const hr = () => L.push("\n---\n");
