@@ -620,6 +620,22 @@ function ProjectPage() {
                     {livePlan.warnings.uses_fallback_protocols && <SourceBadge source="curated-fallback" fallback />}
                   </div>
                 </div>
+                {livePlan.warnings.uses_fallback_protocols && (() => {
+                  const ps = livePlan.source_status?.protocols;
+                  const reason = ps?.reason ?? "";
+                  const statusMatch = reason.match(/HTTP\s+(\d+|—)/i);
+                  const statusCode = statusMatch?.[1] ?? "error";
+                  return (
+                    <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1.5">
+                      <Badge variant="outline" className="border-warning/60 bg-warning/20 text-[10px] font-mono uppercase tracking-wider text-warning-foreground">
+                        protocols.io HTTP {statusCode} → curated fallback used
+                      </Badge>
+                      {reason && (
+                        <span className="text-[11px] text-muted-foreground line-clamp-1">{reason}</span>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="grid gap-2 md:grid-cols-2">
                   {livePlan.protocols.map((p) => (
                     <a
