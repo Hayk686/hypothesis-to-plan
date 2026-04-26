@@ -168,14 +168,26 @@ function ProjectPage() {
             <StatCard label="Estimated Duration" value={`${plan.timeline.length} wks`} helper={`${plan.protocol.length} protocol phases`} />
           </div>
 
-          {/* Verification banner */}
-          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
-            <VerificationBadge verification={{ status: "pending" }} />
-            <span className="text-foreground/80">
-              Demo data is seeded for layout — every literature reference, protocol source, and catalog number is marked
-              <span className="font-mono"> pending verification</span> until a real source is attached.
-            </span>
-          </div>
+          {/* Literature QC banner */}
+          {plan.literatureQc ? (
+            <div className="mt-4 flex flex-wrap items-start gap-3 rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
+              <Badge
+                variant="outline"
+                className="shrink-0 gap-1 border-primary/40 bg-primary/10 font-mono text-[10px] uppercase tracking-wider text-primary"
+              >
+                <FileSearch className="h-3 w-3" /> Literature QC: {plan.literatureQc.result}
+              </Badge>
+              <span className="min-w-0 flex-1 text-foreground/80">{plan.literatureQc.reason}</span>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
+              <VerificationBadge verification={{ status: "pending" }} />
+              <span className="text-foreground/80">
+                Demo data is seeded for layout — every literature reference, protocol source, and catalog number is marked
+                <span className="font-mono"> pending verification</span> until a real source is attached.
+              </span>
+            </div>
+          )}
         </Card>
 
         {/* Tabs */}
