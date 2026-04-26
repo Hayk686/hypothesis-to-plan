@@ -21,6 +21,8 @@ import {
 import { searchLiterature, type DataSource } from "@/lib/services";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { TechStackPanel } from "@/components/TechStackPanel";
+import { LabReadinessCard } from "@/components/LabReadinessCard";
+import { computeLabReadiness } from "@/lib/labReadiness";
 
 export const Route = createFileRoute("/project/$id")({
   head: () => ({
@@ -112,6 +114,7 @@ function ProjectPage() {
   }
 
   const totalBudget = plan.materials.reduce((s, m) => s + m.total, 0);
+  const labReadiness = computeLabReadiness(plan, plan.literatureQc);
   const planText = formatPlanAsMarkdown(project, plan, totalBudget);
 
   const handleCopy = async () => {
@@ -230,6 +233,11 @@ function ProjectPage() {
             </div>
           )}
         </Card>
+
+        {/* Lab Readiness */}
+        <div className="mb-6">
+          <LabReadinessCard report={labReadiness} variant="full" />
+        </div>
 
         {/* Tabs */}
         <Tabs defaultValue="evidence" className="w-full">
@@ -681,6 +689,7 @@ function ProjectPage() {
           project={project}
           plan={plan}
           totalBudget={totalBudget}
+          labReadiness={labReadiness}
           copied={pitchCopied}
           onCopy={() => {
             const lines: string[] = [];
@@ -722,6 +731,7 @@ function JudgeViewOverlay({
   project,
   plan,
   totalBudget,
+  labReadiness,
   copied,
   onCopy,
   onClose,
@@ -729,6 +739,7 @@ function JudgeViewOverlay({
   project: Project;
   plan: GeneratedPlan;
   totalBudget: number;
+  labReadiness: import("@/lib/labReadiness").LabReadinessReport;
   copied: boolean;
   onCopy: () => void;
   onClose: () => void;
@@ -887,6 +898,8 @@ function JudgeViewOverlay({
             <li className="rounded border border-border/60 bg-background/50 p-2 md:col-span-2"><b className="text-primary">Stretch potential:</b> scientist review feedback loop</li>
           </ul>
         </Card>
+
+        <LabReadinessCard report={labReadiness} variant="full" />
 
         <TechStackPanel variant="compact" />
 
