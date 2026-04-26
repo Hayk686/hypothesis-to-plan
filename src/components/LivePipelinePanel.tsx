@@ -64,18 +64,34 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
       if (res.ok) {
         onResult(res.data);
         const w = res.data.warnings;
-        const fallbackBits = [
-          w.uses_fallback_literature && "literature",
-          w.uses_fallback_protocols && "protocols",
-          w.has_unverified_materials && "some materials",
-        ].filter(Boolean);
-        if (fallbackBits.length === 0) {
+        const litLive = !w.uses_fallback_literature;
+        const litCount = res.data.evidence_map?.length ?? 0;
+
+        if (litLive && litCount > 0) {
+          // Always lead with the literature live status so a protocol fallback
+          // never gets misread as "no papers returned".
+          toast.success("Live literature loaded", {
+            description: `Returned ${litCount} papers via Semantic Scholar.`,
+          });
+        }
+        if (w.uses_fallback_protocols) {
+          toast.message("Protocols.io unavailable", {
+            description: "Using curated fallback protocols.",
+          });
+        }
+        if (w.uses_fallback_literature) {
+          toast.message("Literature fallback in use", {
+            description: "Live Semantic Scholar returned no usable results.",
+          });
+        }
+        if (w.has_unverified_materials) {
+          toast.message("Some materials unverified", {
+            description: "Catalog numbers or supplier URLs missing.",
+          });
+        }
+        if (!w.uses_fallback_literature && !w.uses_fallback_protocols && !w.has_unverified_materials) {
           toast.success("Live pipeline complete", {
             description: "All sections backed by live or verified sources.",
-          });
-        } else {
-          toast.message("Live pipeline complete (partial fallback)", {
-            description: `Fallback used for: ${fallbackBits.join(", ")}.`,
           });
         }
       } else {
