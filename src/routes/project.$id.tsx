@@ -418,8 +418,22 @@ function ProjectPage() {
                               >
                                 Catalog: {CATALOG_VERIFY_REQUIRED}
                               </Badge>
+                            ) : m.verification?.sourceUrl ? (
+                              <a
+                                href={m.verification.sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-xs text-primary hover:underline"
+                              >
+                                {m.catalog}
+                              </a>
                             ) : (
                               <div className="font-mono text-xs text-muted-foreground">{m.catalog}</div>
+                            )}
+                            {!needsCatalog && m.verification?.note?.toLowerCase().includes("verify before ordering") && (
+                              <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-warning-foreground/80">
+                                Verify before ordering
+                              </div>
                             )}
                           </TableCell>
                           <TableCell className="text-sm">{m.quantity}</TableCell>
