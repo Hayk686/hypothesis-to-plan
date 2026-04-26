@@ -247,11 +247,14 @@ function ProjectPage() {
           <TabsContent value="evidence" className="mt-6 space-y-4">
             {(() => {
               const displayPapers = livePapers ?? plan.papers;
+              const isRateLimited = /rate limit/i.test(paperSourceNote);
               const sourceLabel =
                 paperSource === "live-api"
                   ? "Live Semantic Scholar"
                   : paperSource === "fallback"
-                    ? "Verified seeded fallback"
+                    ? isRateLimited
+                      ? "Rate limited — using verified seeded fallback"
+                      : "Verified seeded fallback"
                     : "Verified seeded data";
               const sourceClass =
                 paperSource === "live-api"

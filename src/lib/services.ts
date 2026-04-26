@@ -139,6 +139,7 @@ export async function searchLiterature(
     const res = await fetch(url, { headers, signal: controller.signal });
     clearTimeout(timeoutId);
 
+    if (res.status === 429) throw new Error("Rate limited (HTTP 429)");
     if (!res.ok) throw new Error(`S2 HTTP ${res.status}`);
     const json = (await res.json()) as S2Response;
     const items = (json.data ?? []).filter((p) => p.title);
@@ -152,12 +153,14 @@ export async function searchLiterature(
         : "Live Semantic Scholar (public, keyless).",
     };
   } catch (err) {
+    const msg = err instanceof Error ? err.message : "live API unavailable";
+    const isRateLimited = /429|rate/i.test(msg);
     return {
       data: DEMO_PLAN.papers,
       source: "fallback",
-      note: `Verified seeded fallback — ${
-        err instanceof Error ? err.message : "live API unavailable"
-      }.`,
+      note: isRateLimited
+        ? "Rate limited — using verified seeded fallback."
+        : `Verified seeded fallback — ${msg}.`,
     };
   }
 }
