@@ -206,6 +206,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Closest published work — same readouts and direction. Confirms target druggability; your hypothesis extends this to small intestine and adds IL-1β/TNF-α panel.",
       doi: "10.1038/s41556-023-01198-x",
+      verification: PENDING,
     },
     {
       id: "p2",
@@ -220,6 +221,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Defines the clinical gap your hypothesis addresses: why IL6R blockade failed despite strong preclinical signals. Justifies looking at compensatory cytokines.",
       doi: "10.1053/j.gastro.2022.04.018",
+      verification: PENDING,
     },
     {
       id: "p3",
@@ -234,6 +236,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Provides the exact challenge protocol your hypothesis assumes. Use this cocktail and concentrations to ensure reviewers can compare your data directly.",
       doi: "10.1016/j.stem.2023.02.011",
+      verification: PENDING,
     },
     {
       id: "p4",
@@ -248,6 +251,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Methods backbone for your delivery strategy. Adopt their selection regime (puromycin 2 µg/mL × 5 days) to maintain knockdown over the experimental window.",
       doi: "10.1038/s41596-022-00742-2",
+      verification: PENDING,
     },
     {
       id: "p5",
@@ -262,6 +266,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Reference atlas for interpreting your scRNA-seq readouts. Map your post-knockdown clusters against their inflammation-associated states.",
       doi: "10.1016/j.cell.2021.07.004",
+      verification: PENDING,
     },
     {
       id: "p6",
@@ -276,6 +281,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Direct support for your refinement: include IL11 in the compensatory cytokine panel. Strengthens novelty story.",
       doi: "10.1038/s41385-023-00567-1",
+      verification: PENDING,
     },
   ],
   protocol: [
