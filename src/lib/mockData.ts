@@ -1,3 +1,40 @@
+// ============================================================
+// VERIFICATION LAYER
+// ------------------------------------------------------------
+// Every external-source data structure (papers, protocols, supplies,
+// budget, timeline, validation) carries a `verification` field so the
+// app can clearly distinguish:
+//   - "verified"  → a human (or trusted API) confirmed this source
+//   - "pending"   → seeded / suggested data, must be reviewed
+//   - "unverified"→ explicitly flagged as not yet checked
+//
+// All seeded demo data ships as "pending" so the UI never claims a
+// fake citation or catalog number is verified. Replace with real
+// references by editing the source objects in this file (or wiring
+// them to Semantic Scholar / protocols.io / vendor APIs later).
+// ============================================================
+
+export type VerificationStatus = "verified" | "pending" | "unverified";
+
+export type Verification = {
+  status: VerificationStatus;
+  /** Human-readable note: who/what verified, or why pending. */
+  note?: string;
+  /** ISO timestamp of last verification check. */
+  checkedAt?: string;
+  /** Canonical URL of the verified source (DOI, vendor page, protocols.io URL). */
+  sourceUrl?: string;
+};
+
+/** Sentinel for catalog numbers that must be replaced with real values. */
+export const CATALOG_VERIFY_REQUIRED = "VERIFY_REQUIRED";
+
+/** Default verification stamp for seeded demo data. */
+const PENDING: Verification = {
+  status: "pending",
+  note: "Seeded demo data — replace with verified source before publication.",
+};
+
 export type Project = {
   id: string;
   title: string;
@@ -24,6 +61,8 @@ export type Paper = {
   abstract: string;
   whyItMatters: string;
   doi: string;
+  /** Where this paper came from + whether a human confirmed it. */
+  verification: Verification;
 };
 
 export type ProtocolStep = {
@@ -33,17 +72,22 @@ export type ProtocolStep = {
   description: string;
   duration: string;
   equipment: string[];
+  /** Source protocol (e.g. protocols.io DOI) backing this step. */
+  protocolSource?: Verification;
 };
 
 export type Material = {
   name: string;
   purpose: string;
   vendor: string;
+  /** Vendor catalog number. Use CATALOG_VERIFY_REQUIRED if not yet checked. */
   catalog: string;
   quantity: string;
   unitCost: number;
   total: number;
   category: "reagent" | "equipment" | "consumable" | "service";
+  /** Vendor catalog / pricing verification. */
+  verification: Verification;
 };
 
 export type WeekTask = {
@@ -70,6 +114,8 @@ export type ValidationPlan = {
   reproducibilityChecks: string[];
   positiveControl: string;
   negativeControl: string;
+  /** Source backing the validation strategy (e.g. published power analysis, SOP). */
+  source?: Verification;
 };
 
 export type NoveltyAnalysis = {
@@ -95,6 +141,10 @@ export type GeneratedPlan = {
   risks: Risk[];
   problemStatement: string;
   whyItMatters: string;
+  /** Source backing the budget estimate (vendor quotes, prior grants). */
+  budgetSource?: Verification;
+  /** Source backing the timeline estimate (lab SOP, prior project). */
+  timelineSource?: Verification;
 };
 
 // ============================================================
@@ -156,6 +206,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Closest published work — same readouts and direction. Confirms target druggability; your hypothesis extends this to small intestine and adds IL-1β/TNF-α panel.",
       doi: "10.1038/s41556-023-01198-x",
+      verification: PENDING,
     },
     {
       id: "p2",
@@ -170,6 +221,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Defines the clinical gap your hypothesis addresses: why IL6R blockade failed despite strong preclinical signals. Justifies looking at compensatory cytokines.",
       doi: "10.1053/j.gastro.2022.04.018",
+      verification: PENDING,
     },
     {
       id: "p3",
@@ -184,6 +236,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Provides the exact challenge protocol your hypothesis assumes. Use this cocktail and concentrations to ensure reviewers can compare your data directly.",
       doi: "10.1016/j.stem.2023.02.011",
+      verification: PENDING,
     },
     {
       id: "p4",
@@ -198,6 +251,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Methods backbone for your delivery strategy. Adopt their selection regime (puromycin 2 µg/mL × 5 days) to maintain knockdown over the experimental window.",
       doi: "10.1038/s41596-022-00742-2",
+      verification: PENDING,
     },
     {
       id: "p5",
@@ -212,6 +266,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Reference atlas for interpreting your scRNA-seq readouts. Map your post-knockdown clusters against their inflammation-associated states.",
       doi: "10.1016/j.cell.2021.07.004",
+      verification: PENDING,
     },
     {
       id: "p6",
@@ -226,6 +281,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Direct support for your refinement: include IL11 in the compensatory cytokine panel. Strengthens novelty story.",
       doi: "10.1038/s41385-023-00567-1",
+      verification: PENDING,
     },
   ],
   protocol: [
@@ -237,6 +293,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Expand 3 patient-derived intestinal organoid lines in Matrigel domes with IntestiCult medium (passage 6–10). Design 4 sgRNAs per target (IL6, IL6R, scrambled control) using CRISPick; clone into pLentiGuide-puro.",
       duration: "Week 1",
       equipment: ["IntestiCult OGM", "Matrigel", "CRISPick", "Gibson assembly kit"],
+      protocolSource: PENDING,
     },
     {
       step: 2,
@@ -246,6 +303,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Dissociate organoids to single cells, transduce with dCas9-KRAB + sgRNA lentivirus (MOI 5), select with 2 µg/mL puromycin × 5 days. Reform organoids in Matrigel; verify knockdown ≥70% by RT-qPCR.",
       duration: "Week 2–3",
       equipment: ["Lentiviral vectors", "Puromycin", "RT-qPCR", "BSL-2 hood"],
+      protocolSource: PENDING,
     },
     {
       step: 3,
@@ -255,6 +313,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Treat established knockdown organoids (day 7 post-passage) with TNF-α (10 ng/mL) + IFN-γ (10 ng/mL) cocktail or vehicle for 24 h. n=4 wells per condition × 3 organoid lines.",
       duration: "Week 4",
       equipment: ["Recombinant TNF-α", "Recombinant IFN-γ", "96-well plates"],
+      protocolSource: PENDING,
     },
     {
       step: 4,
@@ -264,6 +323,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Collect supernatants for ELISA panel (TNF-α, IL-1β, CXCL8, IL11, IL22). Harvest organoids for bulk RNA-seq (n=3 per condition) and a single dropout 10x scRNA-seq run (1 line, 4 conditions, 5k cells each).",
       duration: "Week 5",
       equipment: ["ELISA kits", "RNeasy", "10x Chromium"],
+      protocolSource: PENDING,
     },
     {
       step: 5,
@@ -273,6 +333,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Positive control: tocilizumab (10 µg/mL) co-treatment. Negative control: scrambled sgRNA + vehicle. Loading control: housekeeping (GAPDH, RPL13). Cell viability: CellTiter-Glo at endpoint.",
       duration: "Parallel to weeks 4–5",
       equipment: ["Tocilizumab", "CellTiter-Glo", "Scrambled sgRNA"],
+      protocolSource: PENDING,
     },
     {
       step: 6,
@@ -282,26 +343,27 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Expected: ≥50% reduction in CXCL8/IL-1β secretion in IL6-KD vs scrambled; partial compensation by IL11 (~30% rebound). scRNA-seq identifies enterocyte subcluster as primary IL6-responder. Deliverables: 4 figures, OSF pre-registration, draft manuscript.",
       duration: "Week 6–8",
       equipment: ["GraphPad Prism", "R/DESeq2", "Seurat"],
+      protocolSource: PENDING,
     },
   ],
   materials: [
-    { name: "Patient-derived organoid lines (3)", purpose: "Biological replicates from independent donors", vendor: "HUB Organoids", catalog: "HUB-INT-01/02/03", quantity: "3 vials", unitCost: 1200, total: 3600, category: "consumable" },
-    { name: "IntestiCult Organoid Growth Medium", purpose: "Maintain organoid expansion across all conditions", vendor: "STEMCELL Tech", catalog: "#06010", quantity: "500 mL", unitCost: 850, total: 850, category: "reagent" },
-    { name: "Matrigel (growth-factor reduced)", purpose: "3D scaffold for organoid embedding", vendor: "Corning", catalog: "#356231", quantity: "10 mL", unitCost: 420, total: 420, category: "reagent" },
-    { name: "dCas9-KRAB lentiviral plasmid", purpose: "CRISPRi backbone for IL6/IL6R knockdown", vendor: "Addgene", catalog: "#89567", quantity: "1 plasmid", unitCost: 85, total: 85, category: "reagent" },
-    { name: "Custom sgRNA oligos (12)", purpose: "Target IL6, IL6R, and scrambled control", vendor: "IDT", catalog: "Ultramer", quantity: "12 sets", unitCost: 38, total: 456, category: "reagent" },
-    { name: "Lentiviral packaging service", purpose: "Concentrated virus for organoid transduction", vendor: "VectorBuilder", catalog: "Lenti-pack-HT", quantity: "4 preps", unitCost: 950, total: 3800, category: "service" },
-    { name: "Recombinant human TNF-α", purpose: "Inflammatory challenge component", vendor: "PeproTech", catalog: "#300-01A", quantity: "100 µg", unitCost: 240, total: 240, category: "reagent" },
-    { name: "Recombinant human IFN-γ", purpose: "Inflammatory challenge component", vendor: "PeproTech", catalog: "#300-02", quantity: "100 µg", unitCost: 285, total: 285, category: "reagent" },
-    { name: "Tocilizumab (clinical grade)", purpose: "Positive control for IL6R inhibition", vendor: "Genentech (research)", catalog: "—", quantity: "20 mg", unitCost: 480, total: 480, category: "reagent" },
-    { name: "Cytokine ELISA panel (5-plex)", purpose: "Quantify TNF-α, IL-1β, CXCL8, IL11, IL22", vendor: "R&D Systems", catalog: "Custom Luminex", quantity: "96 samples", unitCost: 18, total: 1728, category: "reagent" },
-    { name: "TaqMan probes (IL6, IL6R, GAPDH)", purpose: "Validate knockdown by RT-qPCR", vendor: "Thermo Fisher", catalog: "Bundle", quantity: "1000 rxns", unitCost: 1.6, total: 1600, category: "reagent" },
-    { name: "Bulk RNA-seq (12 samples)", purpose: "Transcriptome-wide effect of IL6 KD", vendor: "Novogene", catalog: "PE150 30M", quantity: "12 samples", unitCost: 280, total: 3360, category: "service" },
-    { name: "10x Chromium scRNA-seq (4 samples)", purpose: "Resolve cell-type-specific responses", vendor: "10x Genomics", catalog: "Chromium NextGEM", quantity: "4 reactions", unitCost: 1850, total: 7400, category: "service" },
-    { name: "Puromycin", purpose: "Select transduced organoids", vendor: "Sigma", catalog: "P8833", quantity: "100 mg", unitCost: 95, total: 95, category: "reagent" },
-    { name: "CellTiter-Glo 3D", purpose: "Endpoint viability assay", vendor: "Promega", catalog: "G9681", quantity: "100 mL", unitCost: 580, total: 580, category: "reagent" },
-    { name: "Tissue culture consumables", purpose: "Plates, tips, media bottles", vendor: "Various", catalog: "Bundle", quantity: "Bundle", unitCost: 1400, total: 1400, category: "consumable" },
-    { name: "Personnel (postdoc, 0.3 FTE × 2mo)", purpose: "Hands-on execution & analysis", vendor: "—", catalog: "—", quantity: "0.6 FTE-mo", unitCost: 3100, total: 1860, category: "service" },
+    { name: "Patient-derived organoid lines (3)", purpose: "Biological replicates from independent donors", vendor: "HUB Organoids", catalog: "HUB-INT-01/02/03", quantity: "3 vials", unitCost: 1200, total: 3600, category: "consumable", verification: PENDING },
+    { name: "IntestiCult Organoid Growth Medium", purpose: "Maintain organoid expansion across all conditions", vendor: "STEMCELL Tech", catalog: "#06010", quantity: "500 mL", unitCost: 850, total: 850, category: "reagent", verification: PENDING },
+    { name: "Matrigel (growth-factor reduced)", purpose: "3D scaffold for organoid embedding", vendor: "Corning", catalog: "#356231", quantity: "10 mL", unitCost: 420, total: 420, category: "reagent", verification: PENDING },
+    { name: "dCas9-KRAB lentiviral plasmid", purpose: "CRISPRi backbone for IL6/IL6R knockdown", vendor: "Addgene", catalog: "#89567", quantity: "1 plasmid", unitCost: 85, total: 85, category: "reagent", verification: PENDING },
+    { name: "Custom sgRNA oligos (12)", purpose: "Target IL6, IL6R, and scrambled control", vendor: "IDT", catalog: CATALOG_VERIFY_REQUIRED, quantity: "12 sets", unitCost: 38, total: 456, category: "reagent", verification: PENDING },
+    { name: "Lentiviral packaging service", purpose: "Concentrated virus for organoid transduction", vendor: "VectorBuilder", catalog: "Lenti-pack-HT", quantity: "4 preps", unitCost: 950, total: 3800, category: "service", verification: PENDING },
+    { name: "Recombinant human TNF-α", purpose: "Inflammatory challenge component", vendor: "PeproTech", catalog: "#300-01A", quantity: "100 µg", unitCost: 240, total: 240, category: "reagent", verification: PENDING },
+    { name: "Recombinant human IFN-γ", purpose: "Inflammatory challenge component", vendor: "PeproTech", catalog: "#300-02", quantity: "100 µg", unitCost: 285, total: 285, category: "reagent", verification: PENDING },
+    { name: "Tocilizumab (clinical grade)", purpose: "Positive control for IL6R inhibition", vendor: "Genentech (research)", catalog: CATALOG_VERIFY_REQUIRED, quantity: "20 mg", unitCost: 480, total: 480, category: "reagent", verification: PENDING },
+    { name: "Cytokine ELISA panel (5-plex)", purpose: "Quantify TNF-α, IL-1β, CXCL8, IL11, IL22", vendor: "R&D Systems", catalog: CATALOG_VERIFY_REQUIRED, quantity: "96 samples", unitCost: 18, total: 1728, category: "reagent", verification: PENDING },
+    { name: "TaqMan probes (IL6, IL6R, GAPDH)", purpose: "Validate knockdown by RT-qPCR", vendor: "Thermo Fisher", catalog: CATALOG_VERIFY_REQUIRED, quantity: "1000 rxns", unitCost: 1.6, total: 1600, category: "reagent", verification: PENDING },
+    { name: "Bulk RNA-seq (12 samples)", purpose: "Transcriptome-wide effect of IL6 KD", vendor: "Novogene", catalog: "PE150 30M", quantity: "12 samples", unitCost: 280, total: 3360, category: "service", verification: PENDING },
+    { name: "10x Chromium scRNA-seq (4 samples)", purpose: "Resolve cell-type-specific responses", vendor: "10x Genomics", catalog: "Chromium NextGEM", quantity: "4 reactions", unitCost: 1850, total: 7400, category: "service", verification: PENDING },
+    { name: "Puromycin", purpose: "Select transduced organoids", vendor: "Sigma", catalog: "P8833", quantity: "100 mg", unitCost: 95, total: 95, category: "reagent", verification: PENDING },
+    { name: "CellTiter-Glo 3D", purpose: "Endpoint viability assay", vendor: "Promega", catalog: "G9681", quantity: "100 mL", unitCost: 580, total: 580, category: "reagent", verification: PENDING },
+    { name: "Tissue culture consumables", purpose: "Plates, tips, media bottles", vendor: "Various", catalog: CATALOG_VERIFY_REQUIRED, quantity: "Bundle", unitCost: 1400, total: 1400, category: "consumable", verification: PENDING },
+    { name: "Personnel (postdoc, 0.3 FTE × 2mo)", purpose: "Hands-on execution & analysis", vendor: "—", catalog: "—", quantity: "0.6 FTE-mo", unitCost: 3100, total: 1860, category: "service", verification: PENDING },
   ],
   timeline: [
     { week: 1, phase: "Planning", milestone: "Project kickoff", tasks: ["Finalize sgRNA designs", "Order reagents", "Confirm organoid line availability", "Pre-register on OSF"], deliverable: "Locked experimental design + OSF entry" },
@@ -336,6 +398,7 @@ export const DEMO_PLAN: GeneratedPlan = {
     ],
     positiveControl: "Tocilizumab (10 µg/mL) co-treatment — expected to phenocopy IL6R knockdown direction.",
     negativeControl: "Scrambled sgRNA + vehicle — defines baseline inflammatory response variability.",
+    source: PENDING,
   },
   risks: [
     { id: "r1", title: "IL6 knockdown <70% — insufficient for downstream comparison", category: "scientific", likelihood: "medium", impact: "high", mitigation: "Pre-screen 4 sgRNAs per gene in HEK293T first; advance only top 2 to organoids. Backup: SaCas9-KRAB if SpCas9 fails." },
@@ -351,6 +414,8 @@ export const DEMO_PLAN: GeneratedPlan = {
     "Inflammatory bowel disease affects 7M+ people globally, yet IL6 pathway inhibitors (tocilizumab) failed in late-stage Crohn's trials despite strong preclinical signals. We need a human-relevant model to dissect why — and to identify which epithelial cell types and compensatory cytokines limit efficacy.",
   whyItMatters:
     "If we can show that durable IL6 silencing in human intestinal organoids reduces inflammation by ≥50% and identify the compensatory IL11 axis, we provide a mechanistic rationale for combination therapy — a direct, testable hypothesis for the next IBD clinical trial.",
+  budgetSource: PENDING,
+  timelineSource: PENDING,
 };
 
 const STORAGE_KEY = "h2p_projects_v2";

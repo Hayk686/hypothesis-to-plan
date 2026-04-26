@@ -15,8 +15,10 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  getProject, generatePlan, type Project, type GeneratedPlan,
+  getProject, generatePlan, CATALOG_VERIFY_REQUIRED,
+  type Project, type GeneratedPlan,
 } from "@/lib/mockData";
+import { VerificationBadge } from "@/components/VerificationBadge";
 
 export const Route = createFileRoute("/project/$id")({
   head: () => ({
@@ -165,6 +167,15 @@ function ProjectPage() {
             <StatCard label="Estimated Cost" value={`$${(totalBudget / 1000).toFixed(1)}k`} helper={`${plan.materials.length} line items`} />
             <StatCard label="Estimated Duration" value={`${plan.timeline.length} wks`} helper={`${plan.protocol.length} protocol phases`} />
           </div>
+
+          {/* Verification banner */}
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
+            <VerificationBadge verification={{ status: "pending" }} />
+            <span className="text-foreground/80">
+              Demo data is seeded for layout — every literature reference, protocol source, and catalog number is marked
+              <span className="font-mono"> pending verification</span> until a real source is attached.
+            </span>
+          </div>
         </Card>
 
         {/* Tabs */}
@@ -217,6 +228,7 @@ function ProjectPage() {
                     >
                       DOI <ExternalLink className="ml-1 h-3 w-3" />
                     </a>
+                    <VerificationBadge verification={paper.verification} />
                   </div>
                 </div>
               </Card>
@@ -320,6 +332,7 @@ function ProjectPage() {
                         <h4 className="font-display text-base font-semibold">{step.title}</h4>
                         <Badge variant="outline" className="text-xs">{step.phase}</Badge>
                         <span className="text-xs text-muted-foreground">· {step.duration}</span>
+                        <VerificationBadge verification={step.protocolSource} compact />
                       </div>
                       <p className="mt-1.5 text-sm text-foreground/80">{step.description}</p>
                       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -354,30 +367,46 @@ function ProjectPage() {
                       <TableHead>Qty</TableHead>
                       <TableHead className="text-right">Unit</TableHead>
                       <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Source</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {plan.materials.map((m, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <div className="font-medium">{m.name}</div>
-                          <Badge variant="outline" className="mt-1 text-[10px]">{m.category}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-xs text-sm text-muted-foreground">{m.purpose}</TableCell>
-                        <TableCell className="text-sm">
-                          <div>{m.vendor}</div>
-                          <div className="font-mono text-xs text-muted-foreground">{m.catalog}</div>
-                        </TableCell>
-                        <TableCell className="text-sm">{m.quantity}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">${m.unitCost.toLocaleString()}</TableCell>
-                        <TableCell className="text-right font-mono text-sm font-semibold">${m.total.toLocaleString()}</TableCell>
-                      </TableRow>
-                    ))}
+                    {plan.materials.map((m, i) => {
+                      const needsCatalog = m.catalog === CATALOG_VERIFY_REQUIRED;
+                      return (
+                        <TableRow key={i}>
+                          <TableCell>
+                            <div className="font-medium">{m.name}</div>
+                            <Badge variant="outline" className="mt-1 text-[10px]">{m.category}</Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs text-sm text-muted-foreground">{m.purpose}</TableCell>
+                          <TableCell className="text-sm">
+                            <div>{m.vendor}</div>
+                            {needsCatalog ? (
+                              <Badge
+                                variant="outline"
+                                className="mt-1 border-destructive/30 bg-destructive/10 font-mono text-[10px] text-destructive"
+                                title="Replace this sentinel with a real vendor catalog number before ordering."
+                              >
+                                Catalog: {CATALOG_VERIFY_REQUIRED}
+                              </Badge>
+                            ) : (
+                              <div className="font-mono text-xs text-muted-foreground">{m.catalog}</div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">{m.quantity}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">${m.unitCost.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-mono text-sm font-semibold">${m.total.toLocaleString()}</TableCell>
+                          <TableCell><VerificationBadge verification={m.verification} compact /></TableCell>
+                        </TableRow>
+                      );
+                    })}
                     <TableRow className="bg-muted/40">
                       <TableCell colSpan={5} className="text-right font-semibold">Grand total</TableCell>
                       <TableCell className="text-right font-mono text-lg font-bold text-primary">
                         ${totalBudget.toLocaleString()}
                       </TableCell>
+                      <TableCell><VerificationBadge verification={plan.budgetSource} compact /></TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -387,7 +416,10 @@ function ProjectPage() {
 
           {/* TIMELINE */}
           <TabsContent value="timeline" className="mt-6 space-y-4">
-            <SectionHeader title="Week-by-week timeline" subtitle={`${plan.timeline.length} weeks · ${new Set(plan.timeline.map((t) => t.phase)).size} phases`} />
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <SectionHeader title="Week-by-week timeline" subtitle={`${plan.timeline.length} weeks · ${new Set(plan.timeline.map((t) => t.phase)).size} phases`} />
+              <VerificationBadge verification={plan.timelineSource} />
+            </div>
             <div className="relative">
               <div className="absolute bottom-0 left-5 top-2 hidden w-0.5 bg-gradient-to-b from-primary via-primary/40 to-transparent sm:block" />
               <div className="space-y-3">
@@ -420,7 +452,10 @@ function ProjectPage() {
 
           {/* VALIDATION */}
           <TabsContent value="validation" className="mt-6 space-y-4">
-            <SectionHeader title="Validation plan" subtitle="Primary endpoint, secondary metrics, statistical approach, controls, reproducibility" />
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <SectionHeader title="Validation plan" subtitle="Primary endpoint, secondary metrics, statistical approach, controls, reproducibility" />
+              <VerificationBadge verification={plan.validation.source} />
+            </div>
 
             <Card className="border-primary/30 bg-primary/5 p-6">
               <div className="mb-2 flex items-center gap-2">
@@ -623,10 +658,12 @@ function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget
 
   hr();
   L.push(`## Evidence — related work (${plan.papers.length} papers)`);
+  L.push(`\n_Note: every reference is marked with a verification status. Replace ${"`pending`"} entries with verified Semantic Scholar / DOI sources before publishing._`);
   plan.papers.forEach((p, i) => {
     L.push(`\n### ${i + 1}. ${p.title}`);
     L.push(`- _${p.authors} · ${p.venue} · ${p.year}_`);
     L.push(`- Relevance: ${Math.round(p.similarity * 100)}% · Citations: ${p.citations} · DOI: ${p.doi}`);
+    L.push(`- **Source verification:** \`${p.verification.status}\`${p.verification.note ? ` — ${p.verification.note}` : ""}`);
     L.push(`- **Abstract:** ${p.abstract}`);
     L.push(`- **Why it matters:** ${p.whyItMatters}`);
   });
@@ -652,12 +689,13 @@ function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget
 
   hr();
   L.push(`## Materials & budget`);
-  L.push(`\n| # | Item | Purpose | Supplier | Catalog | Qty | Unit | Total |`);
-  L.push(`|---|------|---------|----------|---------|-----|------|-------|`);
+  L.push(`\n_Catalog numbers shown as \`VERIFY_REQUIRED\` must be replaced with confirmed vendor SKUs before ordering._`);
+  L.push(`\n| # | Item | Purpose | Supplier | Catalog | Qty | Unit | Total | Verification |`);
+  L.push(`|---|------|---------|----------|---------|-----|------|-------|--------------|`);
   plan.materials.forEach((m, i) => {
-    L.push(`| ${i + 1} | ${m.name} | ${m.purpose} | ${m.vendor} | ${m.catalog} | ${m.quantity} | $${m.unitCost.toLocaleString()} | $${m.total.toLocaleString()} |`);
+    L.push(`| ${i + 1} | ${m.name} | ${m.purpose} | ${m.vendor} | ${m.catalog} | ${m.quantity} | $${m.unitCost.toLocaleString()} | $${m.total.toLocaleString()} | ${m.verification.status} |`);
   });
-  L.push(`\n**Grand total: $${totalBudget.toLocaleString()}**`);
+  L.push(`\n**Grand total: $${totalBudget.toLocaleString()}**${plan.budgetSource ? ` _(budget source: ${plan.budgetSource.status})_` : ""}`);
 
   hr();
   L.push(`## Timeline (${plan.timeline.length} weeks)`);
