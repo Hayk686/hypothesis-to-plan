@@ -212,25 +212,37 @@ export function ScientistFeedbackPanel({
       </div>
 
       {lastSaved && (
-        <Card className="mt-4 border-success/30 bg-success/5 p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-success" />
-            <div className="font-display text-sm font-semibold text-success">
-              Feedback saved as structured correction
+        <>
+          <Card className="mt-4 border-success/30 bg-success/5 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              <div className="font-display text-sm font-semibold text-success">
+                Feedback saved as structured correction
+              </div>
             </div>
-          </div>
-          <dl className="grid gap-1.5 text-xs">
-            <FeedbackRow label="Experiment type" value={lastSaved.experimentType} />
-            <FeedbackRow label="Section" value={lastSaved.section} />
-            <FeedbackRow label="Rating" value={`${lastSaved.rating}/5`} />
-            <FeedbackRow label="Original suggestion" value={lastSaved.originalSuggestion} />
-            <FeedbackRow label="Corrected value" value={lastSaved.correctedValue} />
-            <FeedbackRow label="Reason" value={lastSaved.reason} />
-          </dl>
-          <div className="mt-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
-            Will be used as context for the next similar plan.
-          </div>
-        </Card>
+            <dl className="grid gap-1.5 text-xs">
+              <FeedbackRow label="Experiment type" value={lastSaved.experimentType} />
+              <FeedbackRow label="Section" value={lastSaved.section} />
+              <FeedbackRow label="Rating" value={`${lastSaved.rating}/5`} />
+              <FeedbackRow label="Original suggestion" value={lastSaved.originalSuggestion} />
+              <FeedbackRow label="Corrected value" value={lastSaved.correctedValue} />
+              <FeedbackRow label="Reason" value={lastSaved.reason} />
+              <FeedbackRow label="Status" value="Will be used as context for the next similar plan" />
+            </dl>
+          </Card>
+
+          <Card className="mt-3 border-primary/30 bg-primary/5 p-4">
+            <div className="mb-1.5 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <div className="font-display text-sm font-semibold text-primary">
+                Next similar plan improvement
+              </div>
+            </div>
+            <p className="text-xs text-foreground/85">
+              {nextPlanImprovement(lastSaved)}
+            </p>
+          </Card>
+        </>
       )}
 
       {history.length > 0 && (
