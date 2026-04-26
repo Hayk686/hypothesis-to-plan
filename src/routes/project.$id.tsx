@@ -15,8 +15,10 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  getProject, generatePlan, type Project, type GeneratedPlan,
+  getProject, generatePlan, CATALOG_VERIFY_REQUIRED,
+  type Project, type GeneratedPlan,
 } from "@/lib/mockData";
+import { VerificationBadge } from "@/components/VerificationBadge";
 
 export const Route = createFileRoute("/project/$id")({
   head: () => ({
