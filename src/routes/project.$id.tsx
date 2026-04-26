@@ -658,10 +658,12 @@ function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget
 
   hr();
   L.push(`## Evidence — related work (${plan.papers.length} papers)`);
+  L.push(`\n_Note: every reference is marked with a verification status. Replace ${"`pending`"} entries with verified Semantic Scholar / DOI sources before publishing._`);
   plan.papers.forEach((p, i) => {
     L.push(`\n### ${i + 1}. ${p.title}`);
     L.push(`- _${p.authors} · ${p.venue} · ${p.year}_`);
     L.push(`- Relevance: ${Math.round(p.similarity * 100)}% · Citations: ${p.citations} · DOI: ${p.doi}`);
+    L.push(`- **Source verification:** \`${p.verification.status}\`${p.verification.note ? ` — ${p.verification.note}` : ""}`);
     L.push(`- **Abstract:** ${p.abstract}`);
     L.push(`- **Why it matters:** ${p.whyItMatters}`);
   });
