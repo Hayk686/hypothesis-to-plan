@@ -179,7 +179,7 @@ export function computeLabReadiness(
       label: "Protocol source coverage",
       weight: 18,
       score: protoScore,
-      detail: `${protoVerified}/${protoTotal} steps backed by a verified protocol source.`,
+      detail: protoDetail,
     },
     {
       key: "supplies",
