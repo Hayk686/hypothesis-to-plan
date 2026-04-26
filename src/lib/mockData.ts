@@ -256,7 +256,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Primary evidence that trehalose adds protection on top of a standard cryomedium in mammalian cells. Justifies testing trehalose head-to-head against DMSO in HeLa.",
       doi: "https://www.sciencedirect.com/science/article/pii/S2352320420300687",
-      verification: verified(
+      verification: mkVerified(
         "https://www.sciencedirect.com/science/article/pii/S2352320420300687",
         "Primary evidence — trehalose cryoprotective effect in mammalian cells.",
       ),
@@ -274,7 +274,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Primary evidence for the DMSO baseline this hypothesis is trying to beat. Defines the comparison group and the viability assay format you should match.",
       doi: "https://dergipark.org.tr/en/pub/vanvetj/issue/83931/1322291",
-      verification: verified(
+      verification: mkVerified(
         "https://dergipark.org.tr/en/pub/vanvetj/issue/83931/1322291",
         "Primary evidence — HeLa cryopreservation comparison and DMSO baseline.",
       ),
@@ -292,7 +292,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       whyItMatters:
         "Background and limitations source. Use it to discuss why trehalose may need a loading strategy and to frame the mechanistic interpretation of any viability gain.",
       doi: "https://pubs.rsc.org/en/content/articlehtml/2024/md/d4md00174e",
-      verification: verified(
+      verification: mkVerified(
         "https://pubs.rsc.org/en/content/articlehtml/2024/md/d4md00174e",
         "Review/background source — mechanism and limitations of trehalose cryopreservation.",
       ),
@@ -307,7 +307,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Maintain HeLa cells in DMEM (low glucose, with sodium pyruvate) + 10% FBS + 1× antibiotics at 37 °C / 5% CO₂. Expand to 80–90% confluence in T75 flasks. Prepare three freezing media on ice: (A) Standard DMSO control: 90% complete medium + 10% DMSO. (B) Trehalose arm: complete medium + 0.2 M trehalose + 5% DMSO. (C) Sucrose arm (legacy comparator): complete medium + 0.2 M sucrose + 5% DMSO.",
       duration: "Week 1–2",
       equipment: ["Biosafety cabinet", "CO₂ incubator", "T75 flasks", "DMEM low glucose", "FBS", "DMSO", "D-(+)-Trehalose dihydrate", "Sucrose"],
-      protocolSource: verified(
+      protocolSource: mkVerified(
         "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
         "Primary protocol source — OpenWetWare mammalian cell freeze-down/thaw workflow.",
       ),
@@ -320,7 +320,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Wash cells with PBS, dissociate with Trypsin-EDTA 0.25%, neutralise with complete medium, centrifuge 200 × g for 5 min. Resuspend in PBS and count viable cells with trypan blue 0.4% on a hemocytometer. Re-pellet and resuspend in each freezing medium at 1 × 10⁶ cells/mL. Aliquot 1 mL per cryovial; n = 6 vials per arm.",
       duration: "Week 2",
       equipment: ["PBS", "Trypsin-EDTA 0.25%", "Trypan Blue 0.4%", "Hemocytometer", "Cryovials", "Centrifuge"],
-      protocolSource: verified(
+      protocolSource: mkVerified(
         "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
         "Primary protocol source — OpenWetWare mammalian cell freeze-down/thaw workflow.",
       ),
@@ -333,7 +333,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Place vials in a Mr. Frosty (or equivalent isopropanol container) at -80 °C overnight to achieve approximately -1 °C/min cooling. After ≥24 h, transfer all vials to liquid nitrogen vapour phase for ≥7 days before any thaw, to mimic real storage conditions.",
       duration: "Week 2–3",
       equipment: ["Mr. Frosty / controlled-rate container", "-80 °C freezer", "Liquid N₂ dewar"],
-      protocolSource: supporting(
+      protocolSource: mkSupporting(
         "https://lsinetwork.com/hela-cells-freezing-protocol",
         "HeLa-specific freezing walkthrough — supporting source only, not from the official challenge resource list.",
       ),
@@ -346,7 +346,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Thaw each vial rapidly in a 37 °C water bath (~60–90 s, until a small ice nub remains). Transfer to 9 mL pre-warmed complete medium, centrifuge 200 × g for 5 min, resuspend in 1 mL medium. Count with trypan blue 0.4% on a hemocytometer at t = 0 h. Plate the rest into 6-well plates and re-count viability at 24 h and 72 h post-plating.",
       duration: "Week 4",
       equipment: ["37 °C water bath", "Hemocytometer", "Trypan Blue 0.4%", "6-well plates", "Inverted microscope"],
-      protocolSource: supporting(
+      protocolSource: mkSupporting(
         "https://www.protocols.io/view/cryopreservation-of-labyrinthulomycetes-in-treh-vctw6pw",
         "Trehalose-containing cryopreservation workflow — supporting source only; not a HeLa-specific protocol.",
       ),
@@ -359,7 +359,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Positive control: a non-frozen aliquot from the same harvest, kept on ice and counted at the same time points (defines the maximum achievable viability for that harvest). Negative control: vials frozen in PBS only, no cryoprotectant (expected low viability, defines floor). Run all arms blinded to the counter where possible.",
       duration: "Parallel to weeks 2–4",
       equipment: ["Hemocytometer", "Trypan Blue 0.4%", "PBS"],
-      protocolSource: verified(
+      protocolSource: mkVerified(
         "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
         "Primary protocol source — OpenWetWare mammalian cell freeze-down/thaw workflow.",
       ),
@@ -372,7 +372,7 @@ export const DEMO_PLAN: GeneratedPlan = {
         "Pre-registered primary endpoint: difference in mean post-thaw viability (trehalose arm − DMSO arm) at t = 0 h, with success defined as ≥15 percentage points. Secondary endpoints: viability at 24 h and 72 h, plus visual confluence on day 3. Deliverables: locked OSF pre-registration, raw count sheets, one figure per time point, short methods write-up.",
       duration: "Week 5–6",
       equipment: ["GraphPad Prism or R", "OSF account"],
-      protocolSource: verified(
+      protocolSource: mkVerified(
         "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
         "Primary protocol source — analysis aligned to OpenWetWare freeze-down/thaw outputs.",
       ),
@@ -388,7 +388,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       unitCost: 720,
       total: 720,
       category: "consumable",
-      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/cb_93021013"),
+      verification: mkVendor("https://www.sigmaaldrich.com/US/en/product/sigma/cb_93021013"),
     },
     {
       name: "D-(+)-Trehalose dihydrate, ≥99% (HPLC)",
@@ -399,7 +399,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       unitCost: 145,
       total: 145,
       category: "reagent",
-      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/t9449"),
+      verification: mkVendor("https://www.sigmaaldrich.com/US/en/product/sigma/t9449"),
     },
     {
       name: "Dimethyl sulfoxide (DMSO), sterile-filtered",
@@ -410,7 +410,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       unitCost: 95,
       total: 95,
       category: "reagent",
-      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/d2650"),
+      verification: mkVendor("https://www.sigmaaldrich.com/US/en/product/sigma/d2650"),
     },
     {
       name: "DMEM, low glucose, with sodium pyruvate",
@@ -421,7 +421,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       unitCost: 38,
       total: 76,
       category: "reagent",
-      verification: vendor("https://www.thermofisher.com/order/catalog/product/31885023"),
+      verification: mkVendor("https://www.thermofisher.com/order/catalog/product/31885023"),
     },
     {
       name: "Fetal Bovine Serum (FBS), sterile-filtered",
@@ -432,7 +432,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       unitCost: 95,
       total: 380,
       category: "reagent",
-      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/f2442"),
+      verification: mkVendor("https://www.sigmaaldrich.com/US/en/product/sigma/f2442"),
     },
     {
       name: "Phosphate Buffered Saline (PBS)",
@@ -443,7 +443,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       unitCost: 22,
       total: 88,
       category: "reagent",
-      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/p4244"),
+      verification: mkVendor("https://www.sigmaaldrich.com/US/en/product/sigma/p4244"),
     },
     {
       name: "Trypsin-EDTA solution, 0.25%",
@@ -454,7 +454,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       unitCost: 48,
       total: 48,
       category: "reagent",
-      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/t4049"),
+      verification: mkVendor("https://www.sigmaaldrich.com/US/en/product/sigma/t4049"),
     },
     {
       name: "Trypan Blue solution, 0.4%",
@@ -465,7 +465,7 @@ export const DEMO_PLAN: GeneratedPlan = {
       unitCost: 32,
       total: 32,
       category: "reagent",
-      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/t8154"),
+      verification: mkVendor("https://www.sigmaaldrich.com/US/en/product/sigma/t8154"),
     },
     {
       name: "Cryovials, 2 mL, sterile",
@@ -577,7 +577,7 @@ export const DEMO_PLAN: GeneratedPlan = {
     status: "pending",
     note: "Costs derived from real Sigma / Thermo catalog pages (linked per material). Prices and pack sizes change — verify before ordering.",
   },
-  timelineSource: verified(
+  timelineSource: mkVerified(
     "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
     "Timeline derived from OpenWetWare freeze-down/thaw protocol durations.",
   ),
