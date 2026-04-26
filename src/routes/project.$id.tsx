@@ -45,6 +45,8 @@ function ProjectPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [plan, setPlan] = useState<GeneratedPlan | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showJudgeView, setShowJudgeView] = useState(false);
+  const [pitchCopied, setPitchCopied] = useState(false);
 
   useEffect(() => {
     const p = getProject(id);
@@ -109,10 +111,8 @@ function ProjectPage() {
             <ArrowLeft className="mr-1 h-3 w-3" /> All projects
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link to="/project/$id/present" params={{ id: project.id }}>
-                <Presentation className="mr-2 h-4 w-4" /> Judge view
-              </Link>
+            <Button variant="outline" size="sm" onClick={() => setShowJudgeView(true)}>
+              <Presentation className="mr-2 h-4 w-4" /> Judge view
             </Button>
             <Button variant="outline" size="sm" onClick={handleCopy}>
               {copied ? <Check className="mr-2 h-4 w-4 text-success" /> : <Copy className="mr-2 h-4 w-4" />}
@@ -594,6 +594,229 @@ function ProjectPage() {
             </div>
           </TabsContent>
         </Tabs>
+      </div>
+
+      {showJudgeView && (
+        <JudgeViewOverlay
+          project={project}
+          plan={plan}
+          totalBudget={totalBudget}
+          copied={pitchCopied}
+          onCopy={() => {
+            const lines: string[] = [];
+            lines.push(`Hypothesis-to-Plan Core — Judge Pitch Summary`);
+            lines.push(``);
+            lines.push(`PROJECT: ${project.title}`);
+            lines.push(``);
+            lines.push(`HYPOTHESIS:`);
+            lines.push(project.hypothesis);
+            lines.push(``);
+            if (plan.literatureQc) {
+              lines.push(`LITERATURE QC — ${plan.literatureQc.result}`);
+              lines.push(plan.literatureQc.reason);
+              lines.push(``);
+            }
+            lines.push(`KEY EVIDENCE:`);
+            plan.papers.slice(0, 3).forEach((p, i) => {
+              const url = p.verification.sourceUrl ?? p.doi;
+              lines.push(`${i + 1}. ${p.title} (${p.year}) — ${url}`);
+            });
+            lines.push(``);
+            lines.push(`BUDGET: ~$${totalBudget.toLocaleString()} · TIMELINE: ${plan.timeline.length} weeks`);
+            lines.push(``);
+            lines.push(`SUCCESS METRIC: ${plan.validation.primaryMetric.name}`);
+            lines.push(`Target: ${plan.validation.primaryMetric.target}`);
+            navigator.clipboard.writeText(lines.join("\n"));
+            setPitchCopied(true);
+            toast.success("Pitch summary copied");
+            setTimeout(() => setPitchCopied(false), 2000);
+          }}
+          onClose={() => setShowJudgeView(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function JudgeViewOverlay({
+  project,
+  plan,
+  totalBudget,
+  copied,
+  onCopy,
+  onClose,
+}: {
+  project: Project;
+  plan: GeneratedPlan;
+  totalBudget: number;
+  copied: boolean;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  const topPapers = plan.papers.slice(0, 3);
+  const topSupplies = plan.materials.slice(0, 5);
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
+      <div className="sticky top-0 z-10 border-b border-border/60 bg-background/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+          <div className="flex items-center gap-2">
+            <Presentation className="h-4 w-4 text-primary" />
+            <span className="font-display text-sm font-semibold">Judge Presentation View</span>
+            <Badge variant="outline" className="text-[10px]">Hypothesis-to-Plan Core</Badge>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={onCopy}>
+              {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+              {copied ? "Copied" : "Copy Pitch Summary"}
+            </Button>
+            <Button size="sm" onClick={onClose}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
+        <div>
+          <Badge variant="outline" className="mb-3">{project.domain}</Badge>
+          <h1 className="font-display text-3xl font-bold leading-tight tracking-tight md:text-4xl">
+            {project.title}
+          </h1>
+        </div>
+
+        <Card className="border-primary/30 bg-primary/5 p-5">
+          <Badge className="mb-2 bg-primary/15 text-primary hover:bg-primary/20">Demo hypothesis</Badge>
+          <div className="flex items-start gap-2">
+            <Quote className="h-4 w-4 shrink-0 text-primary" />
+            <p className="italic leading-relaxed text-foreground/85">{project.hypothesis}</p>
+          </div>
+        </Card>
+
+        {plan.literatureQc && (
+          <Card className="border-border/60 bg-gradient-card p-5">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <h2 className="font-display text-xl font-semibold">Literature QC</h2>
+              </div>
+              <Badge className="bg-primary/15 text-primary hover:bg-primary/20">
+                Novelty signal: {plan.literatureQc.result}
+              </Badge>
+            </div>
+            <p className="mb-3 text-sm text-foreground/80">{plan.literatureQc.reason}</p>
+            <div className="grid gap-2 md:grid-cols-3">
+              {topPapers.map((p) => {
+                const url = p.verification.sourceUrl ?? p.doi;
+                return (
+                  <a
+                    key={p.id}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg border border-border/60 bg-background/50 p-3 hover:border-primary/40"
+                  >
+                    <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary">
+                      Evidence · {p.year} <ExternalLink className="h-3 w-3" />
+                    </div>
+                    <div className="line-clamp-3 text-sm font-medium leading-snug">{p.title}</div>
+                  </a>
+                );
+              })}
+            </div>
+          </Card>
+        )}
+
+        <Card className="border-border/60 bg-gradient-card p-5">
+          <h2 className="mb-3 font-display text-xl font-semibold">Experiment plan summary</h2>
+          <div className="mb-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Protocol ({plan.protocol.length} phases)</div>
+            <ol className="space-y-1 text-sm">
+              {plan.protocol.map((s) => (
+                <li key={s.step} className="rounded border border-border/60 bg-background/40 px-3 py-1.5">
+                  <span className="font-mono text-xs text-primary">#{s.step}</span>{" "}
+                  <span className="font-medium">{s.title}</span>{" "}
+                  <span className="text-xs text-muted-foreground">— {s.phase} · {s.duration}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="mb-4">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Supplies & catalog #</div>
+              <Badge variant="outline" className="text-[10px]">Verify before ordering</Badge>
+            </div>
+            <ul className="space-y-1 text-sm">
+              {topSupplies.map((m, i) => (
+                <li key={i} className="flex flex-wrap justify-between gap-2 rounded border border-border/60 bg-background/40 px-3 py-1.5">
+                  <span><span className="font-medium">{m.name}</span> <span className="text-xs text-muted-foreground">— {m.vendor}</span></span>
+                  <span className="font-mono text-xs">
+                    {m.verification.sourceUrl ? (
+                      <a href={m.verification.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        {m.catalog}
+                      </a>
+                    ) : m.catalog}
+                    {" · "}${m.total}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-2 text-right text-sm">
+              <span className="text-muted-foreground">Total estimated budget: </span>
+              <span className="font-mono font-bold text-primary">${totalBudget.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Timeline ({plan.timeline.length} weeks) & key dependencies
+            </div>
+            <ol className="space-y-1 text-sm">
+              {plan.timeline.map((wk) => (
+                <li key={wk.week} className="rounded border border-border/60 bg-background/40 px-3 py-1.5">
+                  <span className="font-mono text-xs text-primary">W{wk.week}</span>{" "}
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{wk.phase}</span>{" "}
+                  <span className="font-medium">{wk.milestone}</span>{" "}
+                  <span className="text-muted-foreground">— {wk.deliverable}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Validation success metric</div>
+            </div>
+            <div className="rounded-lg border border-success/30 bg-success/5 p-3 text-sm">
+              <div className="font-medium">{plan.validation.primaryMetric.name}</div>
+              <div className="mt-1 text-foreground/80"><span className="font-semibold text-success">Target:</span> {plan.validation.primaryMetric.target}</div>
+              <div className="mt-1 text-muted-foreground"><span className="font-semibold">Method:</span> {plan.validation.primaryMetric.method}</div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="border-primary/30 bg-gradient-card p-5">
+          <h2 className="mb-3 font-display text-xl font-semibold">Why this matches Challenge 4</h2>
+          <ul className="grid gap-2 text-sm md:grid-cols-2">
+            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Input:</b> plain-language hypothesis</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Literature QC:</b> novelty signal + references</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Experiment Plan:</b> protocol, materials, budget, timeline, validation</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Operational realism:</b> suppliers, catalog #s, dependencies</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2 md:col-span-2"><b className="text-primary">Stretch potential:</b> scientist review feedback loop</li>
+          </ul>
+        </Card>
+
+        <div className="flex flex-wrap items-center justify-center gap-3 pb-6">
+          <Button variant="outline" onClick={onClose}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+          </Button>
+          <Button onClick={onCopy}>
+            {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+            {copied ? "Copied" : "Copy Pitch Summary"}
+          </Button>
+        </div>
       </div>
     </div>
   );
