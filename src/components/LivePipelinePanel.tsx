@@ -183,6 +183,36 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
         </div>
       )}
 
+      {/* Per-source status rows */}
+      {livePlan?.source_status && (
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          {(["literature", "protocols", "materials"] as const).map((k) => {
+            const row = livePlan.source_status![k];
+            const tone = row.ok
+              ? "border-success/40 bg-success/5 text-success"
+              : "border-warning/40 bg-warning/10 text-warning-foreground";
+            const Icon = row.ok ? CheckCircle2 : AlertTriangle;
+            const label =
+              k === "literature" ? "Literature" : k === "protocols" ? "Protocols" : "Materials";
+            return (
+              <div
+                key={k}
+                className={`flex items-start gap-2 rounded-md border p-2 text-xs ${tone}`}
+              >
+                <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div className="min-w-0">
+                  <div className="font-mono uppercase tracking-wider text-[10px] opacity-80">
+                    {label}
+                  </div>
+                  <div className="font-semibold">{row.label}</div>
+                  <div className="mt-0.5 text-[11px] opacity-80 break-words">{row.reason}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Global fallback warning banner */}
       {showWarning && (
         <div className="mt-4 flex flex-wrap items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
@@ -195,7 +225,7 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
               {w!.uses_fallback_literature && "Literature uses curated fallback. "}
               {w!.uses_fallback_protocols && "Protocols use curated fallback. "}
               {w!.has_unverified_materials && "Some materials are not in the verified supplier registry. "}
-              Live source badges appear inline on each tab.
+              See per-source rows above for the exact reason.
             </div>
           </div>
         </div>
