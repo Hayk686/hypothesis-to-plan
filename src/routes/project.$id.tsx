@@ -16,8 +16,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   getProject, generatePlan, CATALOG_VERIFY_REQUIRED,
-  type Project, type GeneratedPlan,
+  type Project, type GeneratedPlan, type Paper,
 } from "@/lib/mockData";
+import { searchLiterature, type DataSource } from "@/lib/services";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { TechStackPanel } from "@/components/TechStackPanel";
 
@@ -49,11 +50,42 @@ function ProjectPage() {
   const [showJudgeView, setShowJudgeView] = useState(false);
   const [pitchCopied, setPitchCopied] = useState(false);
 
+  const [livePapers, setLivePapers] = useState<Paper[] | null>(null);
+  const [paperSource, setPaperSource] = useState<DataSource>("seed");
+  const [paperSourceNote, setPaperSourceNote] = useState<string>("");
+  const [literatureLoading, setLiteratureLoading] = useState(false);
+
   useEffect(() => {
     const p = getProject(id);
     if (!p) throw notFound();
     setProject(p);
-    setPlan(generatePlan(p));
+    const generated = generatePlan(p);
+    setPlan(generated);
+
+    // Try live Semantic Scholar; fall back to seeded papers on any failure.
+    let cancelled = false;
+    setLiteratureLoading(true);
+    const query =
+      `${p.hypothesis} ${p.domain} ${p.organism}`.trim() || p.title;
+    searchLiterature(query)
+      .then((res) => {
+        if (cancelled) return;
+        setLivePapers(res.data);
+        setPaperSource(res.source);
+        setPaperSourceNote(res.note ?? "");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLivePapers(generated.papers);
+        setPaperSource("fallback");
+        setPaperSourceNote("Verified seeded fallback — live API unavailable.");
+      })
+      .finally(() => {
+        if (!cancelled) setLiteratureLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   if (!project || !plan) {
