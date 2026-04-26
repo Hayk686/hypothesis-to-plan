@@ -45,6 +45,8 @@ function ProjectPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [plan, setPlan] = useState<GeneratedPlan | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showJudgeView, setShowJudgeView] = useState(false);
+  const [pitchCopied, setPitchCopied] = useState(false);
 
   useEffect(() => {
     const p = getProject(id);
@@ -109,10 +111,8 @@ function ProjectPage() {
             <ArrowLeft className="mr-1 h-3 w-3" /> All projects
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link to="/project/$id/present" params={{ id: project.id }}>
-                <Presentation className="mr-2 h-4 w-4" /> Judge view
-              </Link>
+            <Button variant="outline" size="sm" onClick={() => setShowJudgeView(true)}>
+              <Presentation className="mr-2 h-4 w-4" /> Judge view
             </Button>
             <Button variant="outline" size="sm" onClick={handleCopy}>
               {copied ? <Check className="mr-2 h-4 w-4 text-success" /> : <Copy className="mr-2 h-4 w-4" />}
