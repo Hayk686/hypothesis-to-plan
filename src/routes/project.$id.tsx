@@ -689,6 +689,7 @@ function ProjectPage() {
           project={project}
           plan={plan}
           totalBudget={totalBudget}
+          labReadiness={labReadiness}
           copied={pitchCopied}
           onCopy={() => {
             const lines: string[] = [];
