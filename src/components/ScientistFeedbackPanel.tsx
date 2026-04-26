@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, MessageSquare, Star } from "lucide-react";
+import { CheckCircle2, MessageSquare, Sparkles, Star } from "lucide-react";
 import { toast } from "sonner";
 
 type Section = "Protocol" | "Supplies" | "Budget" | "Timeline" | "Validation";
