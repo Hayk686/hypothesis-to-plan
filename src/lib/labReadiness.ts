@@ -47,9 +47,16 @@ function clamp(n: number, lo = 0, hi = 100) {
   return Math.max(lo, Math.min(hi, n));
 }
 
+export type ProtocolLiveStatus = {
+  ok: boolean;                // true = live protocols.io worked
+  used_fallback: boolean;     // true = curated fallback used
+  reason?: string;            // e.g. "protocols.io HTTP 400"
+};
+
 export function computeLabReadiness(
   plan: GeneratedPlan,
   literatureQc?: LiteratureQc | null,
+  protocolLive?: ProtocolLiveStatus | null,
 ): LabReadinessReport {
   const missing: string[] = [];
 
@@ -63,8 +70,24 @@ export function computeLabReadiness(
   const protoVerified = plan.protocol.filter(
     (s) => s.protocolSource && s.protocolSource.status === "verified",
   ).length;
-  const protoScore = clamp((protoVerified / protoTotal) * 100);
-  if (protoVerified < protoTotal) {
+  // Base score from seeded protocol-source verification.
+  let protoScore = clamp((protoVerified / protoTotal) * 100);
+  let protoDetail = `${protoVerified}/${protoTotal} steps backed by a verified protocol source.`;
+
+  // Live override: if protocols.io fell back, cap the protocol coverage.
+  if (protocolLive) {
+    if (protocolLive.used_fallback) {
+      protoScore = Math.min(protoScore, 60);
+      const why = protocolLive.reason ? ` ${protocolLive.reason}.` : "";
+      protoDetail = `${protoVerified}/${protoTotal} steps backed by curated fallback protocols; live protocols.io failed.${why}`;
+      missing.push("protocols.io unavailable — using curated fallback protocols");
+    } else if (protocolLive.ok) {
+      protoScore = 100;
+      protoDetail = `${protoTotal}/${protoTotal} steps backed by live protocols.io sources.`;
+    }
+  }
+
+  if (protoVerified < protoTotal && !protocolLive) {
     missing.push(
       `${protoTotal - protoVerified}/${protoTotal} protocol step(s) without a verified source`,
     );
@@ -156,7 +179,7 @@ export function computeLabReadiness(
       label: "Protocol source coverage",
       weight: 18,
       score: protoScore,
-      detail: `${protoVerified}/${protoTotal} steps backed by a verified protocol source.`,
+      detail: protoDetail,
     },
     {
       key: "supplies",
