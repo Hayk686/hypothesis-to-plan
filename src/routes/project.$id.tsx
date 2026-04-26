@@ -60,6 +60,9 @@ function ProjectPage() {
   const [literatureLoading, setLiteratureLoading] = useState(false);
   const [literatureDebug, setLiteratureDebug] = useState<LiteratureDebug | null>(null);
 
+  // /api/generate-plan response (opt-in via the LivePipelinePanel button).
+  const [livePlan, setLivePlan] = useState<LivePlanResponse | null>(null);
+
   useEffect(() => {
     const p = getProject(id);
     if (!p) throw notFound();
