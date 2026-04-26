@@ -249,7 +249,7 @@ async function searchPubMed(
     const sumJson = (await sumRes.json()) as PubMedEsummary;
     const result = sumJson.result ?? {};
     const papers: NormalizedPaper[] = ids
-      .map((id, idx) => {
+      .map((id, idx): NormalizedPaper | null => {
         const item = result[id];
         if (!item || !item.title) return null;
         const authors = (item.authors ?? [])
@@ -280,7 +280,7 @@ async function searchPubMed(
           evidence_role: evidenceRole(idx),
           source: "pubmed",
           tldr: null,
-        } satisfies NormalizedPaper;
+        };
       })
       .filter((p): p is NormalizedPaper => p !== null);
     return { status: sumRes.status, papers };
