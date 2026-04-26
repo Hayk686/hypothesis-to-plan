@@ -231,16 +231,32 @@ function ProjectPage() {
                     <Badge variant="secondary" className="bg-primary/10 text-primary">
                       {Math.round(paper.similarity * 100)}% relevance
                     </Badge>
-                    <span className="font-mono text-xs text-muted-foreground">{paper.citations} cites</span>
-                    <a
-                      href={`https://doi.org/${paper.doi}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-xs text-primary hover:underline"
-                    >
-                      DOI <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
+                    {paper.citations > 0 && (
+                      <span className="font-mono text-xs text-muted-foreground">{paper.citations} cites</span>
+                    )}
+                    {(() => {
+                      const href = paper.verification?.sourceUrl
+                        ?? (paper.doi.startsWith("http") ? paper.doi : `https://doi.org/${paper.doi}`);
+                      return (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center text-xs text-primary hover:underline"
+                        >
+                          Open source <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      );
+                    })()}
                     <VerificationBadge verification={paper.verification} />
+                    {paper.verification?.note?.toLowerCase().startsWith("supporting source") && (
+                      <Badge
+                        variant="outline"
+                        className="border-warning/40 bg-warning/10 font-mono text-[10px] uppercase tracking-wider text-warning-foreground"
+                      >
+                        Supporting source
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </Card>
