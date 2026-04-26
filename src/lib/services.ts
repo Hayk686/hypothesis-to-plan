@@ -33,11 +33,20 @@ import {
 /** Where the data is currently coming from. Surfaced in the UI. */
 export type DataSource = "seed" | "live-api" | "fallback";
 
+export type LiteratureDebug = {
+  proxyUsed: boolean;
+  hasApiKey: boolean;
+  semanticScholarStatus: number;
+  resultCount: number;
+};
+
 export type ServiceResult<T> = {
   data: T;
   source: DataSource;
   /** Optional human-readable note for the UI (e.g. "Semantic Scholar hit"). */
   note?: string;
+  /** Optional debug info surfaced in the dev/debug UI line. */
+  debug?: LiteratureDebug;
 };
 
 const SIMULATED_LATENCY_MS = 250;
