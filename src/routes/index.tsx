@@ -12,6 +12,10 @@ import {
   CheckCircle2,
   ArrowRight,
   Zap,
+  ShieldCheck,
+  BookCheck,
+  Wrench,
+  MessagesSquare,
 } from "lucide-react";
 import { DEMO_PROJECT } from "@/lib/mockData";
 
