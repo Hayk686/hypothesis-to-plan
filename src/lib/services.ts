@@ -319,6 +319,203 @@ export async function saveScientistFeedback(
 }
 
 // ------------------------------------------------------------
+// 6. Live plan generation — POST /api/generate-plan
+// ------------------------------------------------------------
+/** Stages reported via the onStage callback, so the UI can show a stepper. */
+export type GeneratePlanStage =
+  | "searching-literature"
+  | "checking-protocols"
+  | "resolving-materials"
+  | "generating-plan"
+  | "done"
+  | "error";
+
+export type LivePlanPaper = {
+  id: string;
+  title: string;
+  authors: string;
+  year: number;
+  venue: string;
+  abstract: string;
+  citation_count: number;
+  influential_citation_count: number;
+  source_url: string;
+  doi: string | null;
+  pmid: string | null;
+  relevance_score: number;
+  evidence_role: "primary" | "supporting" | "background";
+  source: "semantic-scholar" | "pubmed";
+  tldr: string | null;
+};
+
+export type LivePlanProtocol = {
+  id: string;
+  title: string;
+  url: string;
+  source: "protocols.io" | "curated-fallback";
+  authors: string;
+  relevance_score: number;
+  matched_keywords: string[];
+  description: string;
+};
+
+export type LivePlanMaterial = {
+  name: string;
+  supplier: string;
+  product: string;
+  catalog: string;
+  category: "reagent" | "equipment" | "consumable" | "service";
+  unit_cost: number;
+  pack_size: string;
+  source_url: string;
+  verified: boolean;
+  note: string;
+};
+
+export type LivePlanResponse = {
+  project_summary: {
+    title: string;
+    hypothesis: string;
+    domain: string;
+    organism_or_system: string;
+    budget_cap: number;
+    timeline_weeks: number;
+    constraints: string;
+    source: string;
+  };
+  literature_qc: { result: string; reason: string; weak_evidence: boolean };
+  evidence_map: Array<{
+    id: string;
+    title: string;
+    role: "primary" | "supporting" | "background";
+    source: "semantic-scholar" | "pubmed";
+    source_url: string;
+    relevance_score: number;
+    year: number;
+    venue: string;
+  }>;
+  protocols: LivePlanProtocol[];
+  materials_budget: {
+    items: LivePlanMaterial[];
+    subtotal_verified: number;
+    budget_cap: number;
+    within_budget: boolean;
+    source_badge: string;
+  };
+  lab_readiness_score: number;
+  timeline: Array<{
+    week: number;
+    phase: string;
+    milestone: string;
+    tasks: string[];
+    deliverable: string;
+  }>;
+  validation_plan: {
+    primary_metric: { name: string; target: string; method: string };
+    secondary_metrics: { name: string; target: string; method: string }[];
+    statistical_approach: string;
+    reproducibility_checks: string[];
+    positive_control: string;
+    negative_control: string;
+  };
+  risks: Array<{
+    id: string;
+    title: string;
+    category: string;
+    likelihood: string;
+    impact: string;
+    mitigation: string;
+  }>;
+  scientist_review_questions: string[];
+  judge_presentation_view: unknown;
+  warnings: {
+    evidence_weak: boolean;
+    uses_fallback_literature: boolean;
+    uses_fallback_protocols: boolean;
+    has_unverified_materials: boolean;
+  };
+  debug: {
+    orchestrator: { evidenceWeak: boolean; usedFallback: Record<string, boolean> };
+    literature: unknown;
+    protocols: unknown;
+    materials: unknown;
+  };
+};
+
+export type LivePlanResult =
+  | { ok: true; data: LivePlanResponse }
+  | { ok: false; error: string; status: number };
+
+/**
+ * Call the orchestrator route. The `onStage` callback fires at each stage
+ * boundary so the UI can render a "Searching literature → Checking protocols
+ * → Resolving materials → Generating plan" stepper.
+ *
+ * Stages are simulated client-side (the server does the work in parallel), so
+ * the user sees clear progress without slowing the response down. The final
+ * "generating-plan" stage matches the actual orchestration call.
+ */
+export async function generatePlanLive(
+  project: {
+    id?: string;
+    title: string;
+    hypothesis: string;
+    domain: string;
+    organism: string;
+    budget: number;
+    timelineWeeks: number;
+    constraints?: string;
+  },
+  onStage?: (stage: GeneratePlanStage) => void,
+): Promise<LivePlanResult> {
+  // Drive the visible stepper. Each delay is short — purely UX feedback.
+  const tick = (s: GeneratePlanStage) => onStage?.(s);
+
+  tick("searching-literature");
+  await new Promise((r) => setTimeout(r, 250));
+  tick("checking-protocols");
+  await new Promise((r) => setTimeout(r, 200));
+  tick("resolving-materials");
+  await new Promise((r) => setTimeout(r, 200));
+  tick("generating-plan");
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const res = await fetch("/api/generate-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        project: {
+          id: project.id,
+          title: project.title,
+          hypothesis: project.hypothesis,
+          domain: project.domain,
+          organism_or_system: project.organism,
+          budget: project.budget,
+          timelineWeeks: project.timelineWeeks,
+          constraints: project.constraints,
+        },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      tick("error");
+      return { ok: false, error: `Orchestrator HTTP ${res.status}`, status: res.status };
+    }
+    const json = (await res.json()) as LivePlanResponse;
+    tick("done");
+    return { ok: true, data: json };
+  } catch (err) {
+    tick("error");
+    const msg = err instanceof Error ? err.message : "live pipeline failed";
+    return { ok: false, error: msg, status: 0 };
+  }
+}
+
+// ------------------------------------------------------------
 // Stack manifest — surfaced in the "API Readiness" UI panel.
 // ------------------------------------------------------------
 export const TECH_STACK = {

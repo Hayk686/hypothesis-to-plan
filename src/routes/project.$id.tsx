@@ -18,11 +18,12 @@ import {
   getProject, generatePlan, CATALOG_VERIFY_REQUIRED,
   type Project, type GeneratedPlan, type Paper,
 } from "@/lib/mockData";
-import { searchLiterature, type DataSource, type LiteratureDebug } from "@/lib/services";
+import { searchLiterature, type DataSource, type LiteratureDebug, type LivePlanResponse } from "@/lib/services";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { TechStackPanel } from "@/components/TechStackPanel";
 import { LabReadinessCard } from "@/components/LabReadinessCard";
 import { ScientistFeedbackPanel } from "@/components/ScientistFeedbackPanel";
+import { LivePipelinePanel, SourceBadge } from "@/components/LivePipelinePanel";
 import { computeLabReadiness } from "@/lib/labReadiness";
 
 export const Route = createFileRoute("/project/$id")({
@@ -58,6 +59,9 @@ function ProjectPage() {
   const [paperSourceNote, setPaperSourceNote] = useState<string>("");
   const [literatureLoading, setLiteratureLoading] = useState(false);
   const [literatureDebug, setLiteratureDebug] = useState<LiteratureDebug | null>(null);
+
+  // /api/generate-plan response (opt-in via the LivePipelinePanel button).
+  const [livePlan, setLivePlan] = useState<LivePlanResponse | null>(null);
 
   useEffect(() => {
     const p = getProject(id);
@@ -117,8 +121,17 @@ function ProjectPage() {
     );
   }
 
-  const totalBudget = plan.materials.reduce((s, m) => s + m.total, 0);
-  const labReadiness = computeLabReadiness(plan, plan.literatureQc);
+  // Effective values: prefer livePlan when present, else fall back to seeded plan.
+  const liveTotalBudget = livePlan
+    ? livePlan.materials_budget.items.reduce((s, m) => s + m.unit_cost, 0)
+    : null;
+  const totalBudget = liveTotalBudget ?? plan.materials.reduce((s, m) => s + m.total, 0);
+  const labReadiness = livePlan
+    ? {
+        ...computeLabReadiness(plan, plan.literatureQc),
+        score: livePlan.lab_readiness_score,
+      }
+    : computeLabReadiness(plan, plan.literatureQc);
   const planText = formatPlanAsMarkdown(project, plan, totalBudget);
 
   const handleCopy = async () => {
@@ -271,6 +284,13 @@ function ProjectPage() {
           )}
         </Card>
 
+        {/* Real-data pipeline (opt-in) */}
+        <LivePipelinePanel
+          project={project}
+          livePlan={livePlan}
+          onResult={setLivePlan}
+        />
+
         {/* Lab Readiness */}
         <div className="mb-6">
           <LabReadinessCard report={labReadiness} variant="full" />
@@ -290,6 +310,46 @@ function ProjectPage() {
 
           {/* EVIDENCE */}
           <TabsContent value="evidence" className="mt-6 space-y-4">
+            {livePlan && livePlan.evidence_map.length > 0 && (
+              <Card className="border-success/30 bg-success/5 p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FileSearch className="h-4 w-4 text-success" />
+                    <h3 className="font-display text-sm font-semibold">Live evidence ({livePlan.evidence_map.length})</h3>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <SourceBadge source="live-semantic-scholar" />
+                    {livePlan.evidence_map.some((e) => e.source === "pubmed") && <SourceBadge source="pubmed" />}
+                    {livePlan.warnings.uses_fallback_literature && <SourceBadge source="curated-fallback" fallback />}
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {livePlan.evidence_map.slice(0, 6).map((e) => (
+                    <a
+                      key={e.id}
+                      href={e.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md border border-border/60 bg-background/60 p-2 hover:border-primary/40"
+                    >
+                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <span className="font-mono">{e.role}</span>
+                        <span>·</span>
+                        <span>{e.year || "—"}</span>
+                        <span>·</span>
+                        <span>{Math.round(e.relevance_score * 100)}% rel.</span>
+                      </div>
+                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-snug">{e.title}</div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">{e.venue}</div>
+                    </a>
+                  ))}
+                </div>
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  <span className="font-mono">Literature QC:</span>{" "}
+                  <span className="text-foreground/80">{livePlan.literature_qc.result}</span> — {livePlan.literature_qc.reason}
+                </div>
+              </Card>
+            )}
             {(() => {
               const displayPapers = livePapers ?? plan.papers;
               const isRateLimited = /rate limit/i.test(paperSourceNote);
@@ -480,6 +540,51 @@ function ProjectPage() {
 
           {/* PROTOCOL */}
           <TabsContent value="protocol" className="mt-6 space-y-4">
+            {livePlan && livePlan.protocols.length > 0 && (
+              <Card className="border-success/30 bg-success/5 p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Beaker className="h-4 w-4 text-success" />
+                    <h3 className="font-display text-sm font-semibold">
+                      Live protocols ({livePlan.protocols.length})
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {livePlan.protocols.some((p) => p.source === "protocols.io") && (
+                      <SourceBadge source="protocols.io" />
+                    )}
+                    {livePlan.warnings.uses_fallback_protocols && <SourceBadge source="curated-fallback" fallback />}
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {livePlan.protocols.map((p) => (
+                    <a
+                      key={p.id}
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md border border-border/60 bg-background/60 p-2 hover:border-primary/40"
+                    >
+                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <span className="font-mono">{p.source}</span>
+                        <span>·</span>
+                        <span>{Math.round(p.relevance_score * 100)}% rel.</span>
+                      </div>
+                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-snug">{p.title}</div>
+                      {p.matched_keywords.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {p.matched_keywords.slice(0, 4).map((k) => (
+                            <Badge key={k} variant="secondary" className="text-[9px]">
+                              {k}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              </Card>
+            )}
             <SectionHeader title="Experimental protocol" subtitle={`${plan.protocol.length} phases — preparation through expected outputs`} />
             <div className="space-y-3">
               {plan.protocol.map((step) => (
@@ -510,6 +615,68 @@ function ProjectPage() {
 
           {/* MATERIALS */}
           <TabsContent value="materials" className="mt-6 space-y-4">
+            {livePlan && livePlan.materials_budget.items.length > 0 && (
+              <Card className="border-success/30 bg-success/5 p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4 text-success" />
+                    <h3 className="font-display text-sm font-semibold">
+                      Live materials ({livePlan.materials_budget.items.length})
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {livePlan.warnings.has_unverified_materials ? (
+                      <SourceBadge source="curated-fallback" fallback />
+                    ) : (
+                      <SourceBadge source="verified-supplier" />
+                    )}
+                    <Badge variant="outline" className="text-[10px]">
+                      Subtotal ${livePlan.materials_budget.subtotal_verified.toLocaleString()} /
+                      cap ${livePlan.materials_budget.budget_cap.toLocaleString()}
+                    </Badge>
+                  </div>
+                </div>
+                <ul className="grid gap-1.5 text-xs sm:grid-cols-2">
+                  {livePlan.materials_budget.items.map((m, i) => (
+                    <li
+                      key={`${m.name}-${i}`}
+                      className="flex items-start justify-between gap-2 rounded border border-border/60 bg-background/60 px-2 py-1.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium leading-tight">{m.name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {m.supplier} · {m.pack_size}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {m.source_url ? (
+                          <a
+                            href={m.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-[11px] text-primary hover:underline"
+                          >
+                            {m.catalog}
+                          </a>
+                        ) : (
+                          <span className="font-mono text-[11px] text-muted-foreground">{m.catalog}</span>
+                        )}
+                        <span className="font-mono text-[10px]">${m.unit_cost.toLocaleString()}</span>
+                        {m.verified ? (
+                          <Badge variant="outline" className="border-success/40 bg-success/10 text-[9px] text-success">
+                            verified
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-warning/40 bg-warning/10 text-[9px] text-warning-foreground">
+                            verify
+                          </Badge>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
             <div className="flex items-end justify-between">
               <SectionHeader title="Materials & budget" subtitle={`${plan.materials.length} line items`} />
               <div className="text-right">
@@ -591,6 +758,34 @@ function ProjectPage() {
 
           {/* TIMELINE */}
           <TabsContent value="timeline" className="mt-6 space-y-4">
+            {livePlan && livePlan.timeline.length > 0 && (
+              <Card className="border-success/30 bg-success/5 p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-success" />
+                    <h3 className="font-display text-sm font-semibold">
+                      Live timeline ({livePlan.timeline.length} weeks)
+                    </h3>
+                  </div>
+                  <SourceBadge source="seed" />
+                </div>
+                <ul className="space-y-1 text-xs">
+                  {livePlan.timeline.map((wk) => (
+                    <li key={wk.week} className="rounded border border-border/60 bg-background/60 px-2 py-1.5">
+                      <span className="font-mono text-primary">W{wk.week}</span>{" "}
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{wk.phase}</span>{" "}
+                      <span className="font-medium">{wk.milestone}</span>{" "}
+                      <span className="text-muted-foreground">— {wk.deliverable}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  Generated from project inputs by{" "}
+                  <code className="font-mono text-foreground/80">/api/generate-plan</code>.
+                  Detailed weekly view below uses the seeded baseline.
+                </div>
+              </Card>
+            )}
             <div className="flex flex-wrap items-end justify-between gap-3">
               <SectionHeader title="Week-by-week timeline" subtitle={`${plan.timeline.length} weeks · ${new Set(plan.timeline.map((t) => t.phase)).size} phases`} />
               <VerificationBadge verification={plan.timelineSource} />
