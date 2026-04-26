@@ -22,6 +22,7 @@ import { searchLiterature, type DataSource } from "@/lib/services";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { TechStackPanel } from "@/components/TechStackPanel";
 import { LabReadinessCard } from "@/components/LabReadinessCard";
+import { ScientistFeedbackPanel } from "@/components/ScientistFeedbackPanel";
 import { computeLabReadiness } from "@/lib/labReadiness";
 
 export const Route = createFileRoute("/project/$id")({
@@ -682,6 +683,10 @@ function ProjectPage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        <div className="mt-8">
+          <ScientistFeedbackPanel experimentType={deriveExperimentType(project)} />
+        </div>
       </div>
 
       {showJudgeView && (
@@ -889,17 +894,29 @@ function JudgeViewOverlay({
         </Card>
 
         <Card className="border-primary/30 bg-gradient-card p-5">
-          <h2 className="mb-3 font-display text-xl font-semibold">Why this matches Challenge 4</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-display text-xl font-semibold">Challenge 4 — Hypothesis → Literature QC → Runnable Experiment Plan</h2>
+            <Badge variant="outline" className="border-success/40 bg-success/10 text-[10px] uppercase tracking-wider text-success">
+              Verified source-backed demo
+            </Badge>
+          </div>
           <ul className="grid gap-2 text-sm md:grid-cols-2">
             <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Input:</b> plain-language hypothesis</li>
-            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Literature QC:</b> novelty signal + references</li>
-            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Experiment Plan:</b> protocol, materials, budget, timeline, validation</li>
-            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Operational realism:</b> suppliers, catalog #s, dependencies</li>
-            <li className="rounded border border-border/60 bg-background/50 p-2 md:col-span-2"><b className="text-primary">Stretch potential:</b> scientist review feedback loop</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2">
+              <b className="text-primary">Literature QC:</b> novelty signal —{" "}
+              <span className="font-mono">{plan.literatureQc?.result ?? "Similar work exists"}</span>
+            </li>
+            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Protocol:</b> grounded in public protocol references (OpenWetWare / protocols.io)</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Supplies:</b> supplier + catalog #s with verify-before-ordering notes</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Budget & timeline:</b> ${totalBudget.toLocaleString()} · {plan.timeline.length} weeks with dependencies</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Validation:</b> primary metric, controls, statistical approach</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2 md:col-span-2"><b className="text-primary">Lab Readiness Score + scientist feedback loop:</b> closes the corrections cycle locally</li>
           </ul>
         </Card>
 
         <LabReadinessCard report={labReadiness} variant="full" />
+
+        <ScientistFeedbackPanel experimentType={deriveExperimentType(project)} compact />
 
         <TechStackPanel variant="compact" />
 
@@ -994,6 +1011,13 @@ function slugify(s: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60) || "research-plan";
+}
+
+function deriveExperimentType(project: Project): string {
+  const organism = project.organism?.split(/[(,]/)[0]?.trim();
+  const domain = project.domain?.split(/[/,]/)[0]?.trim();
+  if (organism && domain) return `${organism} · ${domain}`;
+  return organism || domain || project.title;
 }
 
 function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget: number): string {

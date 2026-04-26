@@ -50,7 +50,7 @@ function LandingPage() {
         <div className="relative mx-auto max-w-7xl px-6 pt-20 pb-24 text-center">
           <Badge variant="secondary" className="mb-6 border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">
             <Zap className="mr-1.5 h-3 w-3" />
-            Hackathon MVP · Mock data demo
+            Verified source-backed demo · API-ready literature QC
           </Badge>
           <h1 className="mx-auto max-w-4xl text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl">
             From hypothesis to{" "}
@@ -205,7 +205,7 @@ function LandingPage() {
       </section>
 
       <footer className="border-t border-border/60 py-8 text-center text-xs text-muted-foreground">
-        Hypothesis→Plan · Hackathon MVP · Mock data — Semantic Scholar & protocols.io integrations coming.
+        Hypothesis→Plan · Seeded with verified public sources for demo reliability · Optional live Semantic Scholar refresh.
       </footer>
     </div>
   );

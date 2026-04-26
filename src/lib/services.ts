@@ -333,5 +333,5 @@ export const TECH_STACK = {
     "Railway or Render for the FastAPI backend",
   ],
   demoNote:
-    "This hackathon demo uses verified seeded real-source data and mock fallback data. Real APIs can replace the service layer (src/lib/services.ts) without changing the UI.",
+    "This demo uses verified public-source seed data with optional Semantic Scholar refresh. Real APIs can replace the service layer (src/lib/services.ts) without changing the UI.",
 } as const;
