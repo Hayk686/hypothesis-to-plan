@@ -237,11 +237,33 @@ function ProjectPage() {
 
           {/* EVIDENCE */}
           <TabsContent value="evidence" className="mt-6 space-y-4">
-            <SectionHeader
-              title="Related work"
-              subtitle={`${plan.papers.length} papers from Semantic Scholar (mock) ranked by relevance`}
-            />
-            {plan.papers.map((paper) => (
+            {(() => {
+              const displayPapers = livePapers ?? plan.papers;
+              const sourceLabel =
+                paperSource === "live-api"
+                  ? "Live Semantic Scholar"
+                  : paperSource === "fallback"
+                    ? "Verified seeded fallback"
+                    : "Verified seeded data";
+              const sourceClass =
+                paperSource === "live-api"
+                  ? "border-success/40 bg-success/10 text-success"
+                  : "border-warning/40 bg-warning/10 text-warning-foreground";
+              return (
+                <>
+                  <SectionHeader
+                    title="Related work"
+                    subtitle={`${displayPapers.length} papers ranked by relevance`}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className={`text-[10px] uppercase tracking-wider ${sourceClass}`}>
+                      {literatureLoading ? "Querying Semantic Scholar…" : sourceLabel}
+                    </Badge>
+                    {paperSourceNote && (
+                      <span className="text-xs text-muted-foreground">{paperSourceNote}</span>
+                    )}
+                  </div>
+                  {displayPapers.map((paper) => (
               <Card key={paper.id} className="border-border/60 bg-gradient-card p-5 transition-smooth hover:border-primary/40">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
