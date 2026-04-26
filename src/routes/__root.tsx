@@ -30,13 +30,13 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Hypothesis-TO-Plan" },
+      { title: "Hypothesis→Plan — AI Research Co-Scientist" },
       {
         name: "description",
         content:
           "Turn a raw scientific hypothesis into a complete experimental plan: novelty scoring, related work, protocols, budgets, timelines, validation, and risk analysis.",
       },
-      { property: "og:title", content: "Hypothesis-TO-Plan" },
+      { property: "og:title", content: "Hypothesis→Plan — AI Research Co-Scientist" },
       {
         property: "og:description",
         content: "Generate a full experimental plan from a single hypothesis in seconds.",
@@ -47,7 +47,7 @@ export const Route = createRootRoute({
         rel: "preconnect",
         href: "https://fonts.googleapis.com",
       },
-      { name: "twitter:title", content: "Hypothesis-TO-Plan" },
+      { name: "twitter:title", content: "Hypothesis→Plan — AI Research Co-Scientist" },
       { name: "description", content: "An AI research co-scientist that transforms scientific hypotheses into comprehensive experimental plans." },
       { property: "og:description", content: "An AI research co-scientist that transforms scientific hypotheses into comprehensive experimental plans." },
       { name: "twitter:description", content: "An AI research co-scientist that transforms scientific hypotheses into comprehensive experimental plans." },
