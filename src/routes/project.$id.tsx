@@ -228,6 +228,7 @@ function ProjectPage() {
                     >
                       DOI <ExternalLink className="ml-1 h-3 w-3" />
                     </a>
+                    <VerificationBadge verification={paper.verification} />
                   </div>
                 </div>
               </Card>
