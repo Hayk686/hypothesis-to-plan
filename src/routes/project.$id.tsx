@@ -367,30 +367,46 @@ function ProjectPage() {
                       <TableHead>Qty</TableHead>
                       <TableHead className="text-right">Unit</TableHead>
                       <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Source</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {plan.materials.map((m, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <div className="font-medium">{m.name}</div>
-                          <Badge variant="outline" className="mt-1 text-[10px]">{m.category}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-xs text-sm text-muted-foreground">{m.purpose}</TableCell>
-                        <TableCell className="text-sm">
-                          <div>{m.vendor}</div>
-                          <div className="font-mono text-xs text-muted-foreground">{m.catalog}</div>
-                        </TableCell>
-                        <TableCell className="text-sm">{m.quantity}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">${m.unitCost.toLocaleString()}</TableCell>
-                        <TableCell className="text-right font-mono text-sm font-semibold">${m.total.toLocaleString()}</TableCell>
-                      </TableRow>
-                    ))}
+                    {plan.materials.map((m, i) => {
+                      const needsCatalog = m.catalog === CATALOG_VERIFY_REQUIRED;
+                      return (
+                        <TableRow key={i}>
+                          <TableCell>
+                            <div className="font-medium">{m.name}</div>
+                            <Badge variant="outline" className="mt-1 text-[10px]">{m.category}</Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs text-sm text-muted-foreground">{m.purpose}</TableCell>
+                          <TableCell className="text-sm">
+                            <div>{m.vendor}</div>
+                            {needsCatalog ? (
+                              <Badge
+                                variant="outline"
+                                className="mt-1 border-destructive/30 bg-destructive/10 font-mono text-[10px] text-destructive"
+                                title="Replace this sentinel with a real vendor catalog number before ordering."
+                              >
+                                Catalog: {CATALOG_VERIFY_REQUIRED}
+                              </Badge>
+                            ) : (
+                              <div className="font-mono text-xs text-muted-foreground">{m.catalog}</div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">{m.quantity}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">${m.unitCost.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-mono text-sm font-semibold">${m.total.toLocaleString()}</TableCell>
+                          <TableCell><VerificationBadge verification={m.verification} compact /></TableCell>
+                        </TableRow>
+                      );
+                    })}
                     <TableRow className="bg-muted/40">
                       <TableCell colSpan={5} className="text-right font-semibold">Grand total</TableCell>
                       <TableCell className="text-right font-mono text-lg font-bold text-primary">
                         ${totalBudget.toLocaleString()}
                       </TableCell>
+                      <TableCell><VerificationBadge verification={plan.budgetSource} compact /></TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
