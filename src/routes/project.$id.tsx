@@ -59,34 +59,42 @@ function ProjectPage() {
     const p = getProject(id);
     if (!p) throw notFound();
     setProject(p);
-    const generated = generatePlan(p);
-    setPlan(generated);
-
-    // Try live Semantic Scholar; fall back to seeded papers on any failure.
-    let cancelled = false;
-    setLiteratureLoading(true);
-    const query =
-      `${p.hypothesis} ${p.domain} ${p.organism}`.trim() || p.title;
-    searchLiterature(query)
-      .then((res) => {
-        if (cancelled) return;
-        setLivePapers(res.data);
-        setPaperSource(res.source);
-        setPaperSourceNote(res.note ?? "");
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLivePapers(generated.papers);
-        setPaperSource("fallback");
-        setPaperSourceNote("Verified seeded fallback — live API unavailable.");
-      })
-      .finally(() => {
-        if (!cancelled) setLiteratureLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    setPlan(generatePlan(p));
+    // NOTE: We intentionally do NOT call the live Semantic Scholar API on
+    // initial render. The page must load with verified seeded data even with
+    // no internet, no API key, or an upstream failure. The user can opt in
+    // via the "Refresh from Semantic Scholar" button in the Evidence tab.
   }, [id]);
+
+  const handleRefreshLiterature = async () => {
+    if (!project) return;
+    setLiteratureLoading(true);
+    try {
+      const query =
+        `${project.hypothesis} ${project.domain} ${project.organism}`.trim() ||
+        project.title;
+      const res = await searchLiterature(query);
+      setLivePapers(res.data);
+      setPaperSource(res.source);
+      setPaperSourceNote(res.note ?? "");
+      if (res.source === "live-api") {
+        toast.success("Refreshed from Semantic Scholar");
+      } else {
+        toast.message("Using verified seeded fallback", {
+          description: res.note,
+        });
+      }
+    } catch {
+      // Defensive — searchLiterature already swallows errors, but never let
+      // anything escape into the React render tree.
+      setLivePapers(plan?.papers ?? null);
+      setPaperSource("fallback");
+      setPaperSourceNote("Verified seeded fallback — live API unavailable.");
+      toast.message("Using verified seeded fallback");
+    } finally {
+      setLiteratureLoading(false);
+    }
+  };
 
   if (!project || !plan) {
     return (
