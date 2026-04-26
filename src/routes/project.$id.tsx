@@ -91,19 +91,19 @@ function ProjectPage() {
       // actually fallback AND no live papers are available from any source
       // (this refresh OR the orchestrator's livePlan).
       const liveCount = res.source === "live-api" ? res.data.length : 0;
+      const livePlanLitCount = livePlan?.evidence_map?.length ?? 0;
       const livePlanLitOk =
-        livePlan?.source_status?.literature?.used_fallback === false &&
-        (livePlan?.papers?.length ?? 0) > 0;
+        !!livePlan &&
+        livePlan.warnings.uses_fallback_literature === false &&
+        livePlanLitCount > 0;
 
       if (res.source === "live-api" && liveCount > 0) {
         toast.success("Live literature loaded", {
           description: `Returned ${liveCount} paper${liveCount === 1 ? "" : "s"} via Semantic Scholar.`,
         });
       } else if (livePlanLitOk) {
-        // Refresh fell back, but the orchestrator already has live papers —
-        // do not contradict that with a fallback toast.
         toast.message("Live literature already loaded", {
-          description: `Pipeline returned ${livePlan!.papers.length} papers via Semantic Scholar.`,
+          description: `Pipeline returned ${livePlanLitCount} papers via Semantic Scholar.`,
         });
       } else {
         toast.message("Using verified seeded fallback", {
@@ -118,8 +118,9 @@ function ProjectPage() {
       setPaperSourceNote("Verified seeded fallback — live API unavailable.");
       setLiteratureDebug(null);
       const livePlanLitOk =
-        livePlan?.source_status?.literature?.used_fallback === false &&
-        (livePlan?.papers?.length ?? 0) > 0;
+        !!livePlan &&
+        livePlan.warnings.uses_fallback_literature === false &&
+        (livePlan.evidence_map?.length ?? 0) > 0;
       if (!livePlanLitOk) {
         toast.message("Using verified seeded fallback", {
           description: "Live Semantic Scholar request failed.",
