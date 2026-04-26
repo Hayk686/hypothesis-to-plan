@@ -19,6 +19,7 @@ import {
   type Project, type GeneratedPlan,
 } from "@/lib/mockData";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { TechStackPanel } from "@/components/TechStackPanel";
 
 export const Route = createFileRoute("/project/$id")({
   head: () => ({
@@ -807,6 +808,8 @@ function JudgeViewOverlay({
             <li className="rounded border border-border/60 bg-background/50 p-2 md:col-span-2"><b className="text-primary">Stretch potential:</b> scientist review feedback loop</li>
           </ul>
         </Card>
+
+        <TechStackPanel variant="compact" />
 
         <div className="flex flex-wrap items-center justify-center gap-3 pb-6">
           <Button variant="outline" onClick={onClose}>
