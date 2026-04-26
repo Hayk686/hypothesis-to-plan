@@ -39,26 +39,37 @@ export const Route = createFileRoute("/api/search-papers")({
         new Response(null, { status: 204, headers: CORS_HEADERS }),
 
       POST: async ({ request }) => {
+        // Server-only secret — boolean only, never returned or logged.
+        const apiKey = process.env.SEMANTIC_SCHOLAR_API_KEY;
+        const hasApiKey = Boolean(apiKey);
+
         let query = "";
         try {
           const body = (await request.json()) as { query?: unknown };
           if (typeof body.query === "string") query = body.query.trim();
         } catch {
           return jsonResponse(
-            { error: "Invalid JSON body. Expected { query: string }." },
+            {
+              error: "Invalid JSON body. Expected { query: string }.",
+              debug: { proxyUsed: true, hasApiKey, semanticScholarStatus: 0, resultCount: 0 },
+            },
             400,
           );
         }
         if (!query) {
-          return jsonResponse({ error: "Query must be a non-empty string." }, 400);
+          return jsonResponse(
+            {
+              error: "Query must be a non-empty string.",
+              debug: { proxyUsed: true, hasApiKey, semanticScholarStatus: 0, resultCount: 0 },
+            },
+            400,
+          );
         }
         if (query.length > 500) query = query.slice(0, 500);
 
         const url = `${S2_ENDPOINT}?query=${encodeURIComponent(query)}&limit=5&fields=${S2_FIELDS}`;
         const headers: Record<string, string> = { Accept: "application/json" };
-        // Server-only secret. Never read VITE_* here.
-        const apiKey = process.env.SEMANTIC_SCHOLAR_API_KEY;
-        if (apiKey) headers["x-api-key"] = apiKey;
+        if (hasApiKey) headers["x-api-key"] = apiKey as string;
 
         try {
           const controller = new AbortController();
@@ -67,24 +78,51 @@ export const Route = createFileRoute("/api/search-papers")({
           clearTimeout(timeoutId);
 
           if (!res.ok) {
+            // Log status only — never the key.
+            console.warn(
+              `[search-papers] Semantic Scholar HTTP ${res.status} (hasApiKey=${hasApiKey})`,
+            );
             return jsonResponse(
               {
                 error: `Semantic Scholar HTTP ${res.status}`,
                 status: res.status,
-                usedApiKey: Boolean(apiKey),
+                usedApiKey: hasApiKey,
+                debug: {
+                  proxyUsed: true,
+                  hasApiKey,
+                  semanticScholarStatus: res.status,
+                  resultCount: 0,
+                },
               },
               res.status === 429 || res.status === 403 ? res.status : 502,
             );
           }
           const json = (await res.json()) as { data?: unknown };
+          const items = Array.isArray(json.data) ? json.data : [];
           return jsonResponse({
-            data: Array.isArray(json.data) ? json.data : [],
-            usedApiKey: Boolean(apiKey),
+            data: items,
+            usedApiKey: hasApiKey,
+            debug: {
+              proxyUsed: true,
+              hasApiKey,
+              semanticScholarStatus: res.status,
+              resultCount: items.length,
+            },
           });
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown upstream error";
+          console.warn(`[search-papers] Upstream fetch failed (hasApiKey=${hasApiKey}): ${msg}`);
           return jsonResponse(
-            { error: `Upstream fetch failed: ${msg}`, usedApiKey: Boolean(apiKey) },
+            {
+              error: `Upstream fetch failed: ${msg}`,
+              usedApiKey: hasApiKey,
+              debug: {
+                proxyUsed: true,
+                hasApiKey,
+                semanticScholarStatus: 0,
+                resultCount: 0,
+              },
+            },
             502,
           );
         }
