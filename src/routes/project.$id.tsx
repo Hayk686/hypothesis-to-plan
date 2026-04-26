@@ -698,14 +698,22 @@ function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget
   L.push(`- **Estimated Cost:** $${totalBudget.toLocaleString()}`);
   L.push(`- **Estimated Duration:** ${plan.timeline.length} weeks`);
 
+  if (plan.literatureQc) {
+    hr();
+    L.push(`## Literature QC`);
+    L.push(`- **Result:** ${plan.literatureQc.result}`);
+    L.push(`- **Reason:** ${plan.literatureQc.reason}`);
+  }
+
   hr();
   L.push(`## Evidence — related work (${plan.papers.length} papers)`);
-  L.push(`\n_Note: every reference is marked with a verification status. Replace ${"`pending`"} entries with verified Semantic Scholar / DOI sources before publishing._`);
   plan.papers.forEach((p, i) => {
+    const url = p.verification?.sourceUrl ?? (p.doi.startsWith("http") ? p.doi : `https://doi.org/${p.doi}`);
     L.push(`\n### ${i + 1}. ${p.title}`);
     L.push(`- _${p.authors} · ${p.venue} · ${p.year}_`);
-    L.push(`- Relevance: ${Math.round(p.similarity * 100)}% · Citations: ${p.citations} · DOI: ${p.doi}`);
-    L.push(`- **Source verification:** \`${p.verification.status}\`${p.verification.note ? ` — ${p.verification.note}` : ""}`);
+    L.push(`- Relevance: ${Math.round(p.similarity * 100)}%${p.citations > 0 ? ` · Citations: ${p.citations}` : ""}`);
+    L.push(`- Source: ${url}`);
+    L.push(`- **Verification:** \`${p.verification.status}\`${p.verification.note ? ` — ${p.verification.note}` : ""}`);
     L.push(`- **Abstract:** ${p.abstract}`);
     L.push(`- **Why it matters:** ${p.whyItMatters}`);
   });
