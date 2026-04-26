@@ -26,6 +26,7 @@ import {
   type Project,
   type GeneratedPlan,
 } from "@/lib/mockData";
+import { TechStackPanel } from "@/components/TechStackPanel";
 
 export const Route = createFileRoute("/project/$id/present")({
   head: () => ({
@@ -473,6 +474,11 @@ function PresentPage() {
             />
           </div>
         </Card>
+
+        {/* Technical Stack & API Readiness */}
+        <div className="mb-6">
+          <TechStackPanel />
+        </div>
 
         {/* Why this matters */}
         <Card className="mb-8 border-primary/30 bg-gradient-hero p-8 text-primary-foreground shadow-glow">
