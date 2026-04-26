@@ -18,11 +18,12 @@ import {
   getProject, generatePlan, CATALOG_VERIFY_REQUIRED,
   type Project, type GeneratedPlan, type Paper,
 } from "@/lib/mockData";
-import { searchLiterature, type DataSource, type LiteratureDebug } from "@/lib/services";
+import { searchLiterature, type DataSource, type LiteratureDebug, type LivePlanResponse } from "@/lib/services";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { TechStackPanel } from "@/components/TechStackPanel";
 import { LabReadinessCard } from "@/components/LabReadinessCard";
 import { ScientistFeedbackPanel } from "@/components/ScientistFeedbackPanel";
+import { LivePipelinePanel, SourceBadge } from "@/components/LivePipelinePanel";
 import { computeLabReadiness } from "@/lib/labReadiness";
 
 export const Route = createFileRoute("/project/$id")({
