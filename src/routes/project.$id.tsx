@@ -81,6 +81,7 @@ function ProjectPage() {
       setLivePapers(res.data);
       setPaperSource(res.source);
       setPaperSourceNote(res.note ?? "");
+      setLiteratureDebug(res.debug ?? null);
       if (res.source === "live-api") {
         toast.success("Refreshed from Semantic Scholar");
       } else {
@@ -94,6 +95,7 @@ function ProjectPage() {
       setLivePapers(plan?.papers ?? null);
       setPaperSource("fallback");
       setPaperSourceNote("Verified seeded fallback — live API unavailable.");
+      setLiteratureDebug(null);
       toast.message("Using verified seeded fallback");
     } finally {
       setLiteratureLoading(false);
