@@ -10,7 +10,7 @@ import {
 import {
   ArrowLeft, ExternalLink, Sparkles, FileSearch, Beaker, ShoppingCart,
   Calendar, CheckCircle2, ShieldAlert, Download, Quote, Presentation,
-  Lightbulb, AlertCircle, Target, Copy, Check,
+  Lightbulb, AlertCircle, Target, Copy, Check, MessagesSquare,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
