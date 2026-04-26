@@ -429,9 +429,9 @@ export type LivePlanResponse = {
   scientist_review_questions: string[];
   judge_presentation_view: unknown;
   source_status?: {
-    literature: { label: string; ok: boolean; reason: string };
-    protocols: { label: string; ok: boolean; reason: string };
-    materials: { label: string; ok: boolean; reason: string };
+    literature: { label: string; ok: boolean; coverage?: "full" | "partial" | "fallback"; reason: string };
+    protocols: { label: string; ok: boolean; coverage?: "full" | "partial" | "fallback"; reason: string };
+    materials: { label: string; ok: boolean; coverage?: "full" | "partial" | "fallback"; reason: string };
   };
   warnings: {
     evidence_weak: boolean;
