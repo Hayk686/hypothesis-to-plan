@@ -147,7 +147,56 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* HOW */}
+      {/* DIFFERENTIATORS — Why this is more than a generic AI planner */}
+      <section className="border-t border-border/60 bg-background">
+        <div className="mx-auto max-w-7xl px-6 py-24">
+          <div className="mb-12 text-center">
+            <Badge variant="outline" className="mb-4 border-primary/30 text-primary">Differentiators</Badge>
+            <h2 className="text-4xl font-bold tracking-tight md:text-5xl">
+              Why this is more than a generic AI planner.
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+              Four design choices that make the output trustworthy at the bench, not just convincing on screen.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: ShieldCheck,
+                title: "Literature QC gate before planning",
+                desc: "Every hypothesis passes a literature quality-control check first. If the evidence base is too thin or contradictory, the planner flags it instead of confidently inventing a protocol.",
+              },
+              {
+                icon: BookCheck,
+                title: "Real-source-backed evidence & protocols",
+                desc: "Papers come with DOIs and verification badges. Protocol steps cite their methodological source. Nothing in the plan is a hallucinated reference.",
+              },
+              {
+                icon: Wrench,
+                title: "Lab Readiness Score",
+                desc: "An operational readiness score covering reagents, equipment, biosafety, and skills — so a PI can see whether their lab can actually run this plan tomorrow.",
+              },
+              {
+                icon: MessagesSquare,
+                title: "Scientist Review feedback loop",
+                desc: "A built-in review surface for domain experts to challenge assumptions, flag missing controls, and feed corrections back into future plans.",
+              },
+            ].map((d) => (
+              <Card
+                key={d.title}
+                className="group flex flex-col border-border/60 bg-gradient-card p-6 transition-smooth hover:border-primary/40 hover:shadow-elegant"
+              >
+                <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary transition-smooth group-hover:bg-primary group-hover:text-primary-foreground">
+                  <d.icon className="h-5 w-5" />
+                </div>
+                <h3 className="font-display text-lg font-semibold leading-snug">{d.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{d.desc}</p>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="border-t border-border/60 bg-muted/30">
         <div className="mx-auto max-w-7xl px-6 py-24">
           <div className="grid gap-12 md:grid-cols-2 md:items-center">
