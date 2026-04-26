@@ -18,7 +18,7 @@ import {
   getProject, generatePlan, CATALOG_VERIFY_REQUIRED,
   type Project, type GeneratedPlan, type Paper,
 } from "@/lib/mockData";
-import { searchLiterature, type DataSource } from "@/lib/services";
+import { searchLiterature, type DataSource, type LiteratureDebug } from "@/lib/services";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { TechStackPanel } from "@/components/TechStackPanel";
 import { LabReadinessCard } from "@/components/LabReadinessCard";
@@ -57,6 +57,7 @@ function ProjectPage() {
   const [paperSource, setPaperSource] = useState<DataSource>("seed");
   const [paperSourceNote, setPaperSourceNote] = useState<string>("");
   const [literatureLoading, setLiteratureLoading] = useState(false);
+  const [literatureDebug, setLiteratureDebug] = useState<LiteratureDebug | null>(null);
 
   useEffect(() => {
     const p = getProject(id);
@@ -80,6 +81,7 @@ function ProjectPage() {
       setLivePapers(res.data);
       setPaperSource(res.source);
       setPaperSourceNote(res.note ?? "");
+      setLiteratureDebug(res.debug ?? null);
       if (res.source === "live-api") {
         toast.success("Refreshed from Semantic Scholar");
       } else {
@@ -93,6 +95,7 @@ function ProjectPage() {
       setLivePapers(plan?.papers ?? null);
       setPaperSource("fallback");
       setPaperSourceNote("Verified seeded fallback — live API unavailable.");
+      setLiteratureDebug(null);
       toast.message("Using verified seeded fallback");
     } finally {
       setLiteratureLoading(false);
@@ -294,6 +297,14 @@ function ProjectPage() {
                       {literatureLoading ? "Refreshing…" : "Refresh from Semantic Scholar"}
                     </Button>
                   </div>
+                  {literatureDebug && (
+                    <div className="rounded-md border border-dashed border-border/60 bg-muted/30 px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                      <span className="mr-3">Proxy: {literatureDebug.proxyUsed ? "active" : "off"}</span>
+                      <span className="mr-3">API key detected: {literatureDebug.hasApiKey ? "yes" : "no"}</span>
+                      <span className="mr-3">Semantic Scholar status: {literatureDebug.semanticScholarStatus || "—"}</span>
+                      <span>Source: {paperSource === "live-api" ? "live" : "fallback"}</span>
+                    </div>
+                  )}
                   {displayPapers.map((paper) => (
               <Card key={paper.id} className="border-border/60 bg-gradient-card p-5 transition-smooth hover:border-primary/40">
                 <div className="flex flex-wrap items-start justify-between gap-3">

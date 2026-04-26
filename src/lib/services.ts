@@ -33,11 +33,20 @@ import {
 /** Where the data is currently coming from. Surfaced in the UI. */
 export type DataSource = "seed" | "live-api" | "fallback";
 
+export type LiteratureDebug = {
+  proxyUsed: boolean;
+  hasApiKey: boolean;
+  semanticScholarStatus: number;
+  resultCount: number;
+};
+
 export type ServiceResult<T> = {
   data: T;
   source: DataSource;
   /** Optional human-readable note for the UI (e.g. "Semantic Scholar hit"). */
   note?: string;
+  /** Optional debug info surfaced in the dev/debug UI line. */
+  debug?: LiteratureDebug;
 };
 
 const SIMULATED_LATENCY_MS = 250;
@@ -121,6 +130,13 @@ export async function searchLiterature(
     };
   }
 
+  let debug: LiteratureDebug = {
+    proxyUsed: true,
+    hasApiKey: false,
+    semanticScholarStatus: 0,
+    resultCount: 0,
+  };
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 9000);
@@ -132,13 +148,29 @@ export async function searchLiterature(
     });
     clearTimeout(timeoutId);
 
+    let json: {
+      data?: S2Paper[];
+      usedApiKey?: boolean;
+      debug?: Partial<LiteratureDebug>;
+    } = {};
+    try {
+      json = await res.json();
+    } catch {
+      // fall through with empty json
+    }
+    if (json.debug) {
+      debug = { ...debug, ...json.debug };
+    } else {
+      debug.semanticScholarStatus = res.status;
+    }
+
     if (res.status === 429) throw new Error("Rate limited (HTTP 429)");
     if (res.status === 403) throw new Error("Forbidden (HTTP 403)");
     if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
 
-    const json = (await res.json()) as { data?: S2Paper[]; usedApiKey?: boolean };
     const items = (json.data ?? []).filter((p) => p && p.title);
     if (!items.length) throw new Error("No papers returned");
+    debug.resultCount = items.length;
 
     return {
       data: items.slice(0, 6).map(s2ToPaper),
@@ -146,6 +178,7 @@ export async function searchLiterature(
       note: json.usedApiKey
         ? "Live Semantic Scholar (server proxy, with API key)."
         : "Live Semantic Scholar (server proxy, keyless).",
+      debug,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "live API unavailable";
@@ -156,6 +189,7 @@ export async function searchLiterature(
       note: isRateLimited
         ? "Rate limited — using verified source-backed fallback."
         : `Verified source-backed fallback — ${msg}.`,
+      debug,
     };
   }
 }
