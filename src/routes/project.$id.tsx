@@ -416,7 +416,10 @@ function ProjectPage() {
 
           {/* TIMELINE */}
           <TabsContent value="timeline" className="mt-6 space-y-4">
-            <SectionHeader title="Week-by-week timeline" subtitle={`${plan.timeline.length} weeks · ${new Set(plan.timeline.map((t) => t.phase)).size} phases`} />
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <SectionHeader title="Week-by-week timeline" subtitle={`${plan.timeline.length} weeks · ${new Set(plan.timeline.map((t) => t.phase)).size} phases`} />
+              <VerificationBadge verification={plan.timelineSource} />
+            </div>
             <div className="relative">
               <div className="absolute bottom-0 left-5 top-2 hidden w-0.5 bg-gradient-to-b from-primary via-primary/40 to-transparent sm:block" />
               <div className="space-y-3">
