@@ -154,13 +154,19 @@ function ProjectPage() {
       <Header />
       <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Breadcrumb + actions */}
-        <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="mb-4 flex items-center justify-between gap-4">
           <Link to="/projects" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="mr-1 h-3 w-3" /> All projects
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowJudgeView(true)}>
-              <Presentation className="mr-2 h-4 w-4" /> Judge view
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                document.getElementById("scientist-review")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              <MessagesSquare className="mr-2 h-4 w-4" /> Scientist Review
             </Button>
             <Button variant="outline" size="sm" onClick={handleCopy}>
               {copied ? <Check className="mr-2 h-4 w-4 text-success" /> : <Copy className="mr-2 h-4 w-4" />}
@@ -169,7 +175,34 @@ function ProjectPage() {
             <Button size="sm" onClick={handleDownload}>
               <Download className="mr-2 h-4 w-4" /> Export .md
             </Button>
+            <Button
+              size="sm"
+              onClick={() => setShowJudgeView(true)}
+              className="bg-gradient-hero shadow-glow"
+            >
+              <Presentation className="mr-2 h-4 w-4" /> Judge View
+            </Button>
           </div>
+        </div>
+
+        {/* Challenge 4 flow banner */}
+        <Card className="mb-4 border-primary/30 bg-primary/5 p-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <Badge className="bg-primary/15 text-primary hover:bg-primary/20">Challenge 4 flow</Badge>
+            <span className="font-mono text-foreground/80">
+              Hypothesis <span className="text-primary">→</span> Literature QC{" "}
+              <span className="text-primary">→</span> Runnable Experiment Plan{" "}
+              <span className="text-primary">→</span> Scientist Review
+            </span>
+          </div>
+        </Card>
+
+        {/* Technical credibility note */}
+        <div className="mb-6 rounded-md border border-dashed border-border/60 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+          <span className="font-mono">
+            Live Semantic Scholar search is routed through{" "}
+            <span className="text-foreground/80">/api/search-papers</span> server proxy with verified fallback for demo stability.
+          </span>
         </div>
 
         {/* Project header */}
