@@ -263,13 +263,24 @@ function ProjectPage() {
                     title="Related work"
                     subtitle={`${displayPapers.length} papers ranked by relevance`}
                   />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className={`text-[10px] uppercase tracking-wider ${sourceClass}`}>
-                      {literatureLoading ? "Querying Semantic Scholar…" : sourceLabel}
-                    </Badge>
-                    {paperSourceNote && (
-                      <span className="text-xs text-muted-foreground">{paperSourceNote}</span>
-                    )}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className={`text-[10px] uppercase tracking-wider ${sourceClass}`}>
+                        {literatureLoading ? "Querying Semantic Scholar…" : sourceLabel}
+                      </Badge>
+                      {paperSourceNote && (
+                        <span className="text-xs text-muted-foreground">{paperSourceNote}</span>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRefreshLiterature}
+                      disabled={literatureLoading}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      {literatureLoading ? "Refreshing…" : "Refresh from Semantic Scholar"}
+                    </Button>
                   </div>
                   {displayPapers.map((paper) => (
               <Card key={paper.id} className="border-border/60 bg-gradient-card p-5 transition-smooth hover:border-primary/40">
