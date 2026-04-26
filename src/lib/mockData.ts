@@ -167,28 +167,34 @@ export type GeneratedPlan = {
 // ============================================================
 
 /** Verification stamp for a real, human-checked source. */
-const verified = (sourceUrl: string, note?: string): Verification => ({
-  status: "verified",
-  sourceUrl,
-  note: note ?? "Verified URL — confirm the page is still live before citing.",
-  checkedAt: "2025-01-15",
-});
+function mkVerified(sourceUrl: string, note?: string): Verification {
+  return {
+    status: "verified",
+    sourceUrl,
+    note: note ?? "Verified URL — confirm the page is still live before citing.",
+    checkedAt: "2025-01-15",
+  };
+}
 
 /** Verification stamp for a supporting (non-primary) source. */
-const supporting = (sourceUrl: string, note: string): Verification => ({
-  status: "verified",
-  sourceUrl,
-  note: `Supporting source — ${note}`,
-  checkedAt: "2025-01-15",
-});
+function mkSupporting(sourceUrl: string, note: string): Verification {
+  return {
+    status: "verified",
+    sourceUrl,
+    note: `Supporting source — ${note}`,
+    checkedAt: "2025-01-15",
+  };
+}
 
 /** Vendor catalog stamp — real SKU but always check current price/availability. */
-const vendor = (sourceUrl: string): Verification => ({
-  status: "verified",
-  sourceUrl,
-  note: "Verify before ordering — confirm catalog number, pack size, and price.",
-  checkedAt: "2025-01-15",
-});
+function mkVendor(sourceUrl: string): Verification {
+  return {
+    status: "verified",
+    sourceUrl,
+    note: "Verify before ordering — confirm catalog number, pack size, and price.",
+    checkedAt: "2025-01-15",
+  };
+}
 
 export const DEMO_PROJECT: Project = {
   id: "demo-trehalose-hela-001",
