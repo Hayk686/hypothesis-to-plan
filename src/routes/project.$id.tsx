@@ -18,7 +18,7 @@ import {
   getProject, generatePlan, CATALOG_VERIFY_REQUIRED,
   type Project, type GeneratedPlan, type Paper,
 } from "@/lib/mockData";
-import { searchLiterature, type DataSource } from "@/lib/services";
+import { searchLiterature, type DataSource, type LiteratureDebug } from "@/lib/services";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { TechStackPanel } from "@/components/TechStackPanel";
 import { LabReadinessCard } from "@/components/LabReadinessCard";
