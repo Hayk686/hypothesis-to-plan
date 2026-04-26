@@ -284,6 +284,13 @@ function ProjectPage() {
           )}
         </Card>
 
+        {/* Real-data pipeline (opt-in) */}
+        <LivePipelinePanel
+          project={project}
+          livePlan={livePlan}
+          onResult={setLivePlan}
+        />
+
         {/* Lab Readiness */}
         <div className="mb-6">
           <LabReadinessCard report={labReadiness} variant="full" />
