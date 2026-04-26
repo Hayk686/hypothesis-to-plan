@@ -398,6 +398,7 @@ export const DEMO_PLAN: GeneratedPlan = {
     ],
     positiveControl: "Tocilizumab (10 µg/mL) co-treatment — expected to phenocopy IL6R knockdown direction.",
     negativeControl: "Scrambled sgRNA + vehicle — defines baseline inflammatory response variability.",
+    source: PENDING,
   },
   risks: [
     { id: "r1", title: "IL6 knockdown <70% — insufficient for downstream comparison", category: "scientific", likelihood: "medium", impact: "high", mitigation: "Pre-screen 4 sgRNAs per gene in HEK293T first; advance only top 2 to organoids. Backup: SaCas9-KRAB if SpCas9 fails." },
@@ -413,6 +414,8 @@ export const DEMO_PLAN: GeneratedPlan = {
     "Inflammatory bowel disease affects 7M+ people globally, yet IL6 pathway inhibitors (tocilizumab) failed in late-stage Crohn's trials despite strong preclinical signals. We need a human-relevant model to dissect why — and to identify which epithelial cell types and compensatory cytokines limit efficacy.",
   whyItMatters:
     "If we can show that durable IL6 silencing in human intestinal organoids reduces inflammation by ≥50% and identify the compensatory IL11 axis, we provide a mechanistic rationale for combination therapy — a direct, testable hypothesis for the next IBD clinical trial.",
+  budgetSource: PENDING,
+  timelineSource: PENDING,
 };
 
 const STORAGE_KEY = "h2p_projects_v2";
