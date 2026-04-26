@@ -1,3 +1,40 @@
+// ============================================================
+// VERIFICATION LAYER
+// ------------------------------------------------------------
+// Every external-source data structure (papers, protocols, supplies,
+// budget, timeline, validation) carries a `verification` field so the
+// app can clearly distinguish:
+//   - "verified"  → a human (or trusted API) confirmed this source
+//   - "pending"   → seeded / suggested data, must be reviewed
+//   - "unverified"→ explicitly flagged as not yet checked
+//
+// All seeded demo data ships as "pending" so the UI never claims a
+// fake citation or catalog number is verified. Replace with real
+// references by editing the source objects in this file (or wiring
+// them to Semantic Scholar / protocols.io / vendor APIs later).
+// ============================================================
+
+export type VerificationStatus = "verified" | "pending" | "unverified";
+
+export type Verification = {
+  status: VerificationStatus;
+  /** Human-readable note: who/what verified, or why pending. */
+  note?: string;
+  /** ISO timestamp of last verification check. */
+  checkedAt?: string;
+  /** Canonical URL of the verified source (DOI, vendor page, protocols.io URL). */
+  sourceUrl?: string;
+};
+
+/** Sentinel for catalog numbers that must be replaced with real values. */
+export const CATALOG_VERIFY_REQUIRED = "VERIFY_REQUIRED";
+
+/** Default verification stamp for seeded demo data. */
+const PENDING: Verification = {
+  status: "pending",
+  note: "Seeded demo data — replace with verified source before publication.",
+};
+
 export type Project = {
   id: string;
   title: string;
@@ -24,6 +61,8 @@ export type Paper = {
   abstract: string;
   whyItMatters: string;
   doi: string;
+  /** Where this paper came from + whether a human confirmed it. */
+  verification: Verification;
 };
 
 export type ProtocolStep = {
@@ -33,17 +72,22 @@ export type ProtocolStep = {
   description: string;
   duration: string;
   equipment: string[];
+  /** Source protocol (e.g. protocols.io DOI) backing this step. */
+  protocolSource?: Verification;
 };
 
 export type Material = {
   name: string;
   purpose: string;
   vendor: string;
+  /** Vendor catalog number. Use CATALOG_VERIFY_REQUIRED if not yet checked. */
   catalog: string;
   quantity: string;
   unitCost: number;
   total: number;
   category: "reagent" | "equipment" | "consumable" | "service";
+  /** Vendor catalog / pricing verification. */
+  verification: Verification;
 };
 
 export type WeekTask = {
@@ -70,6 +114,8 @@ export type ValidationPlan = {
   reproducibilityChecks: string[];
   positiveControl: string;
   negativeControl: string;
+  /** Source backing the validation strategy (e.g. published power analysis, SOP). */
+  source?: Verification;
 };
 
 export type NoveltyAnalysis = {
@@ -95,6 +141,10 @@ export type GeneratedPlan = {
   risks: Risk[];
   problemStatement: string;
   whyItMatters: string;
+  /** Source backing the budget estimate (vendor quotes, prior grants). */
+  budgetSource?: Verification;
+  /** Source backing the timeline estimate (lab SOP, prior project). */
+  timelineSource?: Verification;
 };
 
 // ============================================================
