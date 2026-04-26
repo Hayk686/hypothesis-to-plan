@@ -689,12 +689,13 @@ function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget
 
   hr();
   L.push(`## Materials & budget`);
-  L.push(`\n| # | Item | Purpose | Supplier | Catalog | Qty | Unit | Total |`);
-  L.push(`|---|------|---------|----------|---------|-----|------|-------|`);
+  L.push(`\n_Catalog numbers shown as \`VERIFY_REQUIRED\` must be replaced with confirmed vendor SKUs before ordering._`);
+  L.push(`\n| # | Item | Purpose | Supplier | Catalog | Qty | Unit | Total | Verification |`);
+  L.push(`|---|------|---------|----------|---------|-----|------|-------|--------------|`);
   plan.materials.forEach((m, i) => {
-    L.push(`| ${i + 1} | ${m.name} | ${m.purpose} | ${m.vendor} | ${m.catalog} | ${m.quantity} | $${m.unitCost.toLocaleString()} | $${m.total.toLocaleString()} |`);
+    L.push(`| ${i + 1} | ${m.name} | ${m.purpose} | ${m.vendor} | ${m.catalog} | ${m.quantity} | $${m.unitCost.toLocaleString()} | $${m.total.toLocaleString()} | ${m.verification.status} |`);
   });
-  L.push(`\n**Grand total: $${totalBudget.toLocaleString()}**`);
+  L.push(`\n**Grand total: $${totalBudget.toLocaleString()}**${plan.budgetSource ? ` _(budget source: ${plan.budgetSource.status})_` : ""}`);
 
   hr();
   L.push(`## Timeline (${plan.timeline.length} weeks)`);
