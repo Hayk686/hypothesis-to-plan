@@ -596,7 +596,9 @@ function ProjectPage() {
                   <div className="flex items-center gap-2">
                     <Beaker className="h-4 w-4 text-success" />
                     <h3 className="font-display text-sm font-semibold">
-                      Live protocols ({livePlan.protocols.length})
+                      {livePlan.warnings.uses_fallback_protocols
+                        ? `Curated fallback protocols (${livePlan.protocols.length})`
+                        : `Live protocols (${livePlan.protocols.length})`}
                     </h3>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
