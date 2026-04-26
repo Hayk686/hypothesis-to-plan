@@ -153,12 +153,14 @@ export async function searchLiterature(
         : "Live Semantic Scholar (public, keyless).",
     };
   } catch (err) {
+    const msg = err instanceof Error ? err.message : "live API unavailable";
+    const isRateLimited = /429|rate/i.test(msg);
     return {
       data: DEMO_PLAN.papers,
       source: "fallback",
-      note: `Verified seeded fallback — ${
-        err instanceof Error ? err.message : "live API unavailable"
-      }.`,
+      note: isRateLimited
+        ? "Rate limited — using verified seeded fallback."
+        : `Verified seeded fallback — ${msg}.`,
     };
   }
 }
