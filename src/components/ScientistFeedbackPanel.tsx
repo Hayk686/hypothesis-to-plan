@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, MessageSquare, Star } from "lucide-react";
+import { CheckCircle2, MessageSquare, Sparkles, Star } from "lucide-react";
 import { toast } from "sonner";
 
 type Section = "Protocol" | "Supplies" | "Budget" | "Timeline" | "Validation";
@@ -212,25 +212,37 @@ export function ScientistFeedbackPanel({
       </div>
 
       {lastSaved && (
-        <Card className="mt-4 border-success/30 bg-success/5 p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-success" />
-            <div className="font-display text-sm font-semibold text-success">
-              Feedback saved as structured correction
+        <>
+          <Card className="mt-4 border-success/30 bg-success/5 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              <div className="font-display text-sm font-semibold text-success">
+                Feedback saved as structured correction
+              </div>
             </div>
-          </div>
-          <dl className="grid gap-1.5 text-xs">
-            <FeedbackRow label="Experiment type" value={lastSaved.experimentType} />
-            <FeedbackRow label="Section" value={lastSaved.section} />
-            <FeedbackRow label="Rating" value={`${lastSaved.rating}/5`} />
-            <FeedbackRow label="Original suggestion" value={lastSaved.originalSuggestion} />
-            <FeedbackRow label="Corrected value" value={lastSaved.correctedValue} />
-            <FeedbackRow label="Reason" value={lastSaved.reason} />
-          </dl>
-          <div className="mt-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
-            Will be used as context for the next similar plan.
-          </div>
-        </Card>
+            <dl className="grid gap-1.5 text-xs">
+              <FeedbackRow label="Experiment type" value={lastSaved.experimentType} />
+              <FeedbackRow label="Section" value={lastSaved.section} />
+              <FeedbackRow label="Rating" value={`${lastSaved.rating}/5`} />
+              <FeedbackRow label="Original suggestion" value={lastSaved.originalSuggestion} />
+              <FeedbackRow label="Corrected value" value={lastSaved.correctedValue} />
+              <FeedbackRow label="Reason" value={lastSaved.reason} />
+              <FeedbackRow label="Status" value="Will be used as context for the next similar plan" />
+            </dl>
+          </Card>
+
+          <Card className="mt-3 border-primary/30 bg-primary/5 p-4">
+            <div className="mb-1.5 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <div className="font-display text-sm font-semibold text-primary">
+                Next similar plan improvement
+              </div>
+            </div>
+            <p className="text-xs text-foreground/85">
+              {nextPlanImprovement(lastSaved)}
+            </p>
+          </Card>
+        </>
       )}
 
       {history.length > 0 && (
@@ -269,4 +281,29 @@ function FeedbackRow({ label, value }: { label: string; value: string }) {
       <dd className="text-foreground/90">{value}</dd>
     </div>
   );
+}
+
+function nextPlanImprovement(record: ScientistFeedbackRecord): string {
+  const exp = record.experimentType;
+  const isCryo = /cryopreserv/i.test(exp);
+  const baseSubject = isCryo
+    ? "Future cryopreservation plans"
+    : `Future ${exp.toLowerCase()} plans`;
+
+  switch (record.section) {
+    case "Supplies":
+      return `${baseSubject} will prefer verified catalog numbers and flag vendor/SKU swaps for scientist review before adding to the BOM.`;
+    case "Protocol":
+      return isCryo
+        ? `${baseSubject} will prefer verified catalog numbers and flag trehalose concentration ranges for scientist review.`
+        : `${baseSubject} will surface protocol deviations like this one as recommended adjustments before locking the plan.`;
+    case "Budget":
+      return `${baseSubject} will down-rank cost lines previously corrected by scientists and propose the verified lower-cost option first.`;
+    case "Timeline":
+      return `${baseSubject} will adjust phase durations toward the corrected scientist estimate and flag overly optimistic week counts.`;
+    case "Validation":
+      return `${baseSubject} will require the corrected acceptance criterion (e.g., effect size, time points) up-front in the validation plan.`;
+    default:
+      return `${baseSubject} will use this correction as additional grounding context.`;
+  }
 }
