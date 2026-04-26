@@ -1060,6 +1060,20 @@ function slugify(s: string) {
 function deriveExperimentType(project: Project): string {
   const organism = project.organism?.split(/[(,]/)[0]?.trim();
   const domain = project.domain?.split(/[/,]/)[0]?.trim();
+  // Prefer a concrete "<organism> <technique>" label when the title/hypothesis
+  // makes the technique obvious (e.g. cryopreservation). This is what shows up
+  // in the Scientist Review confirmation card.
+  const haystack = `${project.title} ${project.hypothesis}`.toLowerCase();
+  const techniqueMap: Array<[RegExp, string]> = [
+    [/cryopreserv|cryoprotect|freezing medium|post-thaw/, "cryopreservation"],
+    [/transfect/, "transfection"],
+    [/crispr|knockout|knock-?in/, "CRISPR editing"],
+    [/western blot/, "western blot"],
+    [/flow cytometry|facs/, "flow cytometry"],
+    [/rna-?seq|sequencing/, "sequencing"],
+  ];
+  const technique = techniqueMap.find(([re]) => re.test(haystack))?.[1];
+  if (organism && technique) return `${organism} ${technique}`;
   if (organism && domain) return `${organism} · ${domain}`;
   return organism || domain || project.title;
 }
