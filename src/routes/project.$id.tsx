@@ -332,6 +332,7 @@ function ProjectPage() {
                         <h4 className="font-display text-base font-semibold">{step.title}</h4>
                         <Badge variant="outline" className="text-xs">{step.phase}</Badge>
                         <span className="text-xs text-muted-foreground">· {step.duration}</span>
+                        <VerificationBadge verification={step.protocolSource} compact />
                       </div>
                       <p className="mt-1.5 text-sm text-foreground/80">{step.description}</p>
                       <div className="mt-3 flex flex-wrap gap-1.5">
