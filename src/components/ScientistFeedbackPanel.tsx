@@ -282,3 +282,28 @@ function FeedbackRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function nextPlanImprovement(record: ScientistFeedbackRecord): string {
+  const exp = record.experimentType;
+  const isCryo = /cryopreserv/i.test(exp);
+  const baseSubject = isCryo
+    ? "Future cryopreservation plans"
+    : `Future ${exp.toLowerCase()} plans`;
+
+  switch (record.section) {
+    case "Supplies":
+      return `${baseSubject} will prefer verified catalog numbers and flag vendor/SKU swaps for scientist review before adding to the BOM.`;
+    case "Protocol":
+      return isCryo
+        ? `${baseSubject} will prefer verified catalog numbers and flag trehalose concentration ranges for scientist review.`
+        : `${baseSubject} will surface protocol deviations like this one as recommended adjustments before locking the plan.`;
+    case "Budget":
+      return `${baseSubject} will down-rank cost lines previously corrected by scientists and propose the verified lower-cost option first.`;
+    case "Timeline":
+      return `${baseSubject} will adjust phase durations toward the corrected scientist estimate and flag overly optimistic week counts.`;
+    case "Validation":
+      return `${baseSubject} will require the corrected acceptance criterion (e.g., effect size, time points) up-front in the validation plan.`;
+    default:
+      return `${baseSubject} will use this correction as additional grounding context.`;
+  }
+}
