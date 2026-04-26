@@ -157,16 +157,7 @@ export type GeneratedPlan = {
 };
 
 // ============================================================
-// PRIMARY DEMO: IL6 / intestinal organoids
-// ============================================================
-export const DEMO_PROJECT: Project = {
-  id: "demo-il6-organoid-001",
-  title: "CRISPR knockdown of IL6 signaling in human intestinal organoids",
-  hypothesis:
-    "CRISPR-mediated knockdown of IL6 signaling will reduce inflammatory response in human intestinal organoids, decreasing TNF-α, IL-1β, and CXCL8 secretion by ≥50% under TNF-α/IFN-γ challenge.",
-  domain: "Immunology / Organoid biology",
-  organism: "Human intestinal organoids (iPSC-derived, healthy donor)",
-// ============================================================
+
 // PRIMARY DEMO: Trehalose vs DMSO cryopreservation in HeLa cells
 // ------------------------------------------------------------
 // Every external source below has been replaced with a real,
