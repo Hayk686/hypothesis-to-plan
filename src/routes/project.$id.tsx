@@ -683,6 +683,10 @@ function ProjectPage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        <div className="mt-8">
+          <ScientistFeedbackPanel experimentType={deriveExperimentType(project)} />
+        </div>
       </div>
 
       {showJudgeView && (
