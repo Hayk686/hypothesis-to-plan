@@ -540,6 +540,51 @@ function ProjectPage() {
 
           {/* PROTOCOL */}
           <TabsContent value="protocol" className="mt-6 space-y-4">
+            {livePlan && livePlan.protocols.length > 0 && (
+              <Card className="border-success/30 bg-success/5 p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Beaker className="h-4 w-4 text-success" />
+                    <h3 className="font-display text-sm font-semibold">
+                      Live protocols ({livePlan.protocols.length})
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {livePlan.protocols.some((p) => p.source === "protocols.io") && (
+                      <SourceBadge source="protocols.io" />
+                    )}
+                    {livePlan.warnings.uses_fallback_protocols && <SourceBadge source="curated-fallback" fallback />}
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {livePlan.protocols.map((p) => (
+                    <a
+                      key={p.id}
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md border border-border/60 bg-background/60 p-2 hover:border-primary/40"
+                    >
+                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <span className="font-mono">{p.source}</span>
+                        <span>·</span>
+                        <span>{Math.round(p.relevance_score * 100)}% rel.</span>
+                      </div>
+                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-snug">{p.title}</div>
+                      {p.matched_keywords.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {p.matched_keywords.slice(0, 4).map((k) => (
+                            <Badge key={k} variant="secondary" className="text-[9px]">
+                              {k}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              </Card>
+            )}
             <SectionHeader title="Experimental protocol" subtitle={`${plan.protocol.length} phases — preparation through expected outputs`} />
             <div className="space-y-3">
               {plan.protocol.map((step) => (
