@@ -126,12 +126,24 @@ function ProjectPage() {
     ? livePlan.materials_budget.items.reduce((s, m) => s + m.unit_cost, 0)
     : null;
   const totalBudget = liveTotalBudget ?? plan.materials.reduce((s, m) => s + m.total, 0);
-  const labReadiness = livePlan
+  const protocolLiveStatus = livePlan
     ? {
-        ...computeLabReadiness(plan, plan.literatureQc),
-        score: livePlan.lab_readiness_score,
+        ok: livePlan.source_status?.protocols?.ok ?? !livePlan.warnings.uses_fallback_protocols,
+        used_fallback: livePlan.warnings.uses_fallback_protocols,
+        reason: livePlan.source_status?.protocols?.reason,
       }
-    : computeLabReadiness(plan, plan.literatureQc);
+    : null;
+  const baseReadiness = computeLabReadiness(plan, plan.literatureQc, protocolLiveStatus);
+  const hasMissingCatalogs = baseReadiness.missingChecklist.some((m) =>
+    m.toLowerCase().includes("catalog number"),
+  );
+  const mustCapBelow90 =
+    !!livePlan && (livePlan.warnings.uses_fallback_protocols || hasMissingCatalogs);
+  const liveScore = livePlan ? livePlan.lab_readiness_score : baseReadiness.score;
+  const finalScore = mustCapBelow90 ? Math.min(liveScore, 89) : liveScore;
+  const labReadiness = livePlan
+    ? { ...baseReadiness, score: finalScore }
+    : baseReadiness;
   const planText = formatPlanAsMarkdown(project, plan, totalBudget);
 
   const handleCopy = async () => {
