@@ -234,6 +234,11 @@ function ProjectPage() {
           )}
         </Card>
 
+        {/* Lab Readiness */}
+        <div className="mb-6">
+          <LabReadinessCard report={labReadiness} variant="full" />
+        </div>
+
         {/* Tabs */}
         <Tabs defaultValue="evidence" className="w-full">
           <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-muted/50 p-1">
