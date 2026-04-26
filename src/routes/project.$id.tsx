@@ -570,6 +570,68 @@ function ProjectPage() {
 
           {/* MATERIALS */}
           <TabsContent value="materials" className="mt-6 space-y-4">
+            {livePlan && livePlan.materials_budget.items.length > 0 && (
+              <Card className="border-success/30 bg-success/5 p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4 text-success" />
+                    <h3 className="font-display text-sm font-semibold">
+                      Live materials ({livePlan.materials_budget.items.length})
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {livePlan.warnings.has_unverified_materials ? (
+                      <SourceBadge source="curated-fallback" fallback />
+                    ) : (
+                      <SourceBadge source="verified-supplier" />
+                    )}
+                    <Badge variant="outline" className="text-[10px]">
+                      Subtotal ${livePlan.materials_budget.subtotal_verified.toLocaleString()} /
+                      cap ${livePlan.materials_budget.budget_cap.toLocaleString()}
+                    </Badge>
+                  </div>
+                </div>
+                <ul className="grid gap-1.5 text-xs sm:grid-cols-2">
+                  {livePlan.materials_budget.items.map((m, i) => (
+                    <li
+                      key={`${m.name}-${i}`}
+                      className="flex items-start justify-between gap-2 rounded border border-border/60 bg-background/60 px-2 py-1.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium leading-tight">{m.name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {m.supplier} · {m.pack_size}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {m.source_url ? (
+                          <a
+                            href={m.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-[11px] text-primary hover:underline"
+                          >
+                            {m.catalog}
+                          </a>
+                        ) : (
+                          <span className="font-mono text-[11px] text-muted-foreground">{m.catalog}</span>
+                        )}
+                        <span className="font-mono text-[10px]">${m.unit_cost.toLocaleString()}</span>
+                        {m.verified ? (
+                          <Badge variant="outline" className="border-success/40 bg-success/10 text-[9px] text-success">
+                            verified
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-warning/40 bg-warning/10 text-[9px] text-warning-foreground">
+                            verify
+                          </Badge>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
             <div className="flex items-end justify-between">
               <SectionHeader title="Materials & budget" subtitle={`${plan.materials.length} line items`} />
               <div className="text-right">
