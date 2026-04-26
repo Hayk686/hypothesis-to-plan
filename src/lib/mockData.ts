@@ -126,6 +126,13 @@ export type NoveltyAnalysis = {
   refinement: string;
 };
 
+export type LiteratureQc = {
+  /** Short verdict, e.g. "Similar work exists", "No prior work found", "Direct prior art". */
+  result: string;
+  /** One-sentence reasoning the judge can read at a glance. */
+  reason: string;
+};
+
 export type GeneratedPlan = {
   noveltyScore: number;
   feasibilityScore: number;
@@ -133,6 +140,8 @@ export type GeneratedPlan = {
   noveltyRationale: string;
   researchGap: string;
   noveltyAnalysis: NoveltyAnalysis;
+  /** Top-line literature QC verdict shown on the dashboard. */
+  literatureQc?: LiteratureQc;
   papers: Paper[];
   protocol: ProtocolStep[];
   materials: Material[];
