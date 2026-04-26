@@ -121,8 +121,17 @@ function ProjectPage() {
     );
   }
 
-  const totalBudget = plan.materials.reduce((s, m) => s + m.total, 0);
-  const labReadiness = computeLabReadiness(plan, plan.literatureQc);
+  // Effective values: prefer livePlan when present, else fall back to seeded plan.
+  const liveTotalBudget = livePlan
+    ? livePlan.materials_budget.items.reduce((s, m) => s + m.unit_cost, 0)
+    : null;
+  const totalBudget = liveTotalBudget ?? plan.materials.reduce((s, m) => s + m.total, 0);
+  const labReadiness = livePlan
+    ? {
+        ...computeLabReadiness(plan, plan.literatureQc),
+        score: livePlan.lab_readiness_score,
+      }
+    : computeLabReadiness(plan, plan.literatureQc);
   const planText = formatPlanAsMarkdown(project, plan, totalBudget);
 
   const handleCopy = async () => {
