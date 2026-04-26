@@ -13,6 +13,7 @@ import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectIdRouteImport } from './routes/project.$id'
+import { Route as ApiSearchPapersRouteImport } from './routes/api.search-papers'
 import { Route as ProjectIdPresentRouteImport } from './routes/project.$id.present'
 
 const ProjectsRoute = ProjectsRouteImport.update({
@@ -35,6 +36,11 @@ const ProjectIdRoute = ProjectIdRouteImport.update({
   path: '/project/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSearchPapersRoute = ApiSearchPapersRouteImport.update({
+  id: '/api/search-papers',
+  path: '/api/search-papers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectIdPresentRoute = ProjectIdPresentRouteImport.update({
   id: '/present',
   path: '/present',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/projects': typeof ProjectsRoute
+  '/api/search-papers': typeof ApiSearchPapersRoute
   '/project/$id': typeof ProjectIdRouteWithChildren
   '/project/$id/present': typeof ProjectIdPresentRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/projects': typeof ProjectsRoute
+  '/api/search-papers': typeof ApiSearchPapersRoute
   '/project/$id': typeof ProjectIdRouteWithChildren
   '/project/$id/present': typeof ProjectIdPresentRoute
 }
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/projects': typeof ProjectsRoute
+  '/api/search-papers': typeof ApiSearchPapersRoute
   '/project/$id': typeof ProjectIdRouteWithChildren
   '/project/$id/present': typeof ProjectIdPresentRoute
 }
@@ -69,15 +78,23 @@ export interface FileRouteTypes {
     | '/'
     | '/new'
     | '/projects'
+    | '/api/search-papers'
     | '/project/$id'
     | '/project/$id/present'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/new' | '/projects' | '/project/$id' | '/project/$id/present'
+  to:
+    | '/'
+    | '/new'
+    | '/projects'
+    | '/api/search-papers'
+    | '/project/$id'
+    | '/project/$id/present'
   id:
     | '__root__'
     | '/'
     | '/new'
     | '/projects'
+    | '/api/search-papers'
     | '/project/$id'
     | '/project/$id/present'
   fileRoutesById: FileRoutesById
@@ -86,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NewRoute: typeof NewRoute
   ProjectsRoute: typeof ProjectsRoute
+  ApiSearchPapersRoute: typeof ApiSearchPapersRoute
   ProjectIdRoute: typeof ProjectIdRouteWithChildren
 }
 
@@ -119,6 +137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/search-papers': {
+      id: '/api/search-papers'
+      path: '/api/search-papers'
+      fullPath: '/api/search-papers'
+      preLoaderRoute: typeof ApiSearchPapersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/project/$id/present': {
       id: '/project/$id/present'
       path: '/present'
@@ -145,6 +170,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NewRoute: NewRoute,
   ProjectsRoute: ProjectsRoute,
+  ApiSearchPapersRoute: ApiSearchPapersRoute,
   ProjectIdRoute: ProjectIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
