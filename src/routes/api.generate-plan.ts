@@ -1,26 +1,29 @@
 // ============================================================
-// /api/generate-plan — server route
+// /api/generate-plan — orchestrator
 // ------------------------------------------------------------
-// Orchestrates:
-//   1. /api/search-literature  (Semantic Scholar + optional PubMed)
-//   2. /api/search-protocols   (protocols.io + curated fallback)
-//   3. /api/resolve-materials  (verified supplier registry)
-//
-// Returns a strict JSON object that mirrors the dashboard's
-// existing GeneratedPlan structure plus the new top-level fields:
-//   project_summary, literature_qc, evidence_map, protocols,
-//   materials_budget, lab_readiness_score, timeline,
-//   validation_plan, risks, scientist_review_questions,
-//   judge_presentation_view, debug.
-//
-// Internally it calls the sibling routes by absolute origin so the
-// secrets & headers remain server-side. If a sub-route fails, the
-// orchestrator clearly labels the section as fallback (never
-// silently invents data).
+// Calls the literature / protocols / materials cores DIRECTLY
+// (in-process, not via internal HTTP). This avoids the
+// localhost-internal-origin problem on the worker runtime where
+// `fetch("https://localhost:8080/api/...")` always failed and
+// silently triggered fallbacks.
 // ============================================================
 
 import { createFileRoute } from "@tanstack/react-router";
-import { getRequestUrl } from "@tanstack/react-start/server";
+import {
+  runLiteratureSearch,
+  type LiteratureDebug,
+  type NormalizedPaper,
+} from "@/lib/literature.server";
+import {
+  runProtocolsSearch,
+  type NormalizedProtocol,
+  type ProtocolDebug,
+} from "@/lib/protocols.server";
+import {
+  runMaterialsResolver,
+  type NormalizedMaterial,
+  type ResolveDebug,
+} from "@/lib/materials.server";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -50,90 +53,6 @@ function jsonResponse(body: unknown, status = 200) {
     headers: { "Content-Type": "application/json", ...CORS_HEADERS },
   });
 }
-
-async function callSibling<T>(origin: string, path: string, body: unknown): Promise<{
-  ok: boolean;
-  status: number;
-  json: T | null;
-  error?: string;
-}> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
-    const res = await fetch(`${origin}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    let json: T | null = null;
-    try {
-      json = (await res.json()) as T;
-    } catch {
-      json = null;
-    }
-    return { ok: res.ok, status: res.status, json };
-  } catch (err) {
-    return {
-      ok: false,
-      status: 0,
-      json: null,
-      error: err instanceof Error ? err.message : "sibling call failed",
-    };
-  }
-}
-
-// Sub-route response shapes (loose — only what we consume here).
-type LitResp = {
-  data?: Array<{
-    id: string;
-    title: string;
-    authors: string;
-    year: number;
-    venue: string;
-    abstract: string;
-    citation_count: number;
-    source_url: string;
-    doi: string | null;
-    pmid: string | null;
-    relevance_score: number;
-    evidence_role: "primary" | "supporting" | "background";
-    source: "semantic-scholar" | "pubmed";
-    tldr: string | null;
-  }>;
-  debug?: unknown;
-};
-type ProtoResp = {
-  data?: Array<{
-    id: string;
-    title: string;
-    source: "protocols.io" | "curated-fallback";
-    url: string;
-    authors: string;
-    relevance_score: number;
-    matched_keywords: string[];
-    description: string;
-  }>;
-  debug?: unknown;
-};
-type MatResp = {
-  data?: Array<{
-    name: string;
-    supplier: string;
-    product: string;
-    catalog: string;
-    category: "reagent" | "equipment" | "consumable" | "service";
-    source_url: string;
-    unit_cost: number;
-    pack_size: string;
-    verified: boolean;
-    note: string;
-  }>;
-  debug?: unknown;
-};
-
-// ---------- helpers ----------
 
 function safeStr(v: unknown, fallback = ""): string {
   return typeof v === "string" && v.trim() ? v.trim() : fallback;
@@ -187,17 +106,12 @@ function defaultRisks() {
   ];
 }
 
-// ---------- route ----------
-
 export const Route = createFileRoute("/api/generate-plan")({
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
 
       POST: async ({ request }) => {
-        const url = getRequestUrl();
-        const origin = `${url.protocol}//${url.host}`;
-
         let project: ProjectInput = {};
         try {
           const body = (await request.json()) as { project?: ProjectInput };
@@ -216,34 +130,37 @@ export const Route = createFileRoute("/api/generate-plan")({
         const budget = safeNum(project.budget, 5000);
         const weeks = safeNum(project.timelineWeeks, 6);
 
-        // Run literature, protocols, materials in parallel.
+        // Run literature, protocols, materials in parallel — IN-PROCESS.
         const [lit, proto, mat] = await Promise.all([
-          callSibling<LitResp>(origin, "/api/search-literature", {
-            hypothesis, domain, organism_or_system: organism, constraints,
-          }),
-          callSibling<ProtoResp>(origin, "/api/search-protocols", {
-            hypothesis, organism_or_system: organism,
+          runLiteratureSearch({ hypothesis, domain, organism_or_system: organism, constraints }),
+          runProtocolsSearch({
+            hypothesis,
+            organism_or_system: organism,
             method_keywords: project.method_keywords,
           }),
-          callSibling<MatResp>(origin, "/api/resolve-materials", {
-            organism_or_system: organism,
-            assay_type: domain,
-            required_materials: project.required_materials,
-            protocol_steps: [],
-          }),
+          Promise.resolve(
+            runMaterialsResolver({
+              organism_or_system: organism,
+              assay_type: domain,
+              required_materials: project.required_materials,
+              protocol_steps: [],
+            }),
+          ),
         ]);
 
-        const papers = lit.json?.data ?? [];
-        const protocols = proto.json?.data ?? [];
-        const materials = mat.json?.data ?? [];
+        const papers: NormalizedPaper[] = lit.data;
+        const protocols: NormalizedProtocol[] = proto.data;
+        const materials: NormalizedMaterial[] = mat.data;
+
+        const litDebug: LiteratureDebug = lit.debug;
+        const protoDebug: ProtocolDebug = proto.debug;
+        const matDebug: ResolveDebug = mat.debug;
 
         const evidenceWeak = papers.length < 2;
         const usedFallback = {
-          literature: papers.length === 0,
-          protocols:
-            protocols.length === 0 ||
-            protocols.every((p) => p.source === "curated-fallback"),
-          materials: materials.some((m) => !m.verified),
+          literature: litDebug.used_fallback || papers.length === 0,
+          protocols: protoDebug.used_fallback,
+          materials: matDebug.used_fallback,
         };
 
         // ----- Materials budget -----
@@ -283,10 +200,10 @@ export const Route = createFileRoute("/api/generate-plan")({
           has_evidence: papers.length >= 2 ? 1 : papers.length === 1 ? 0.5 : 0,
         };
         const lab_readiness_score = Math.round(
-          (readinessFactors.verified_materials_ratio * 35 +
+          readinessFactors.verified_materials_ratio * 35 +
             readinessFactors.has_primary_protocol * 25 +
             readinessFactors.within_budget * 20 +
-            readinessFactors.has_evidence * 20),
+            readinessFactors.has_evidence * 20,
         );
 
         // ----- Literature QC -----
@@ -299,12 +216,11 @@ export const Route = createFileRoute("/api/generate-plan")({
                 : "Similar work exists",
           reason:
             papers.length === 0
-              ? "No relevant papers returned by the live literature search. Refine the hypothesis or check the keywords."
-              : `Live literature search returned ${papers.length} relevant papers (top relevance ${Math.round((papers[0]?.relevance_score ?? 0) * 100)}%). Review the primary citation before assuming novelty.`,
+              ? "No relevant papers returned by Semantic Scholar (after broader query variants) and PubMed enhancement returned nothing usable."
+              : `Returned ${papers.length} relevant papers (top relevance ${Math.round((papers[0]?.relevance_score ?? 0) * 100)}%). Source mix: ${litDebug.source}.`,
           weak_evidence: evidenceWeak,
         };
 
-        // ----- Evidence map -----
         const evidence_map = papers.map((p) => ({
           id: p.id,
           title: p.title,
@@ -316,7 +232,6 @@ export const Route = createFileRoute("/api/generate-plan")({
           venue: p.venue,
         }));
 
-        // ----- Validation plan -----
         const validation_plan = {
           primary_metric: {
             name: "Pre-registered primary endpoint derived from the hypothesis",
@@ -337,7 +252,6 @@ export const Route = createFileRoute("/api/generate-plan")({
           negative_control: "Vehicle-only or assay-floor condition",
         };
 
-        // ----- Scientist review questions -----
         const scientist_review_questions = [
           "Is the pre-registered effect size realistic given the published baselines?",
           "Are the verified catalog numbers still in stock at the assumed prices?",
@@ -345,7 +259,6 @@ export const Route = createFileRoute("/api/generate-plan")({
           "Are the proposed controls sufficient to rule out the top two confounders?",
         ];
 
-        // ----- Project summary + judge view -----
         const project_summary = {
           title: safeStr(project.title, "Untitled experiment"),
           hypothesis,
@@ -370,12 +283,36 @@ export const Route = createFileRoute("/api/generate-plan")({
           evidence_strength: evidenceWeak ? "weak" : "adequate",
         };
 
-        // ----- Debug -----
+        // ----- Per-source status (for the UI panel) -----
+        const source_status = {
+          literature: {
+            label: usedFallback.literature ? "Curated fallback" : "Live Semantic Scholar",
+            ok: !usedFallback.literature,
+            reason: usedFallback.literature
+              ? `Fewer than 3 relevant papers after ${litDebug.attempts.length} query variant${litDebug.attempts.length === 1 ? "" : "s"}.`
+              : `${papers.length} papers via ${litDebug.source}.`,
+          },
+          protocols: {
+            label: usedFallback.protocols ? "Curated fallback" : "Live protocols.io",
+            ok: !usedFallback.protocols,
+            reason: usedFallback.protocols
+              ? protoDebug.errors[0]
+                ? `protocols.io error: ${protoDebug.errors[0]}`
+                : "protocols.io returned zero usable protocols."
+              : `${protocols.length} protocols from protocols.io.`,
+          },
+          materials: {
+            label: "Verified supplier registry",
+            ok: matDebug.matchedCount > 0,
+            reason: `${matDebug.matchedCount} matched / ${matDebug.unmatchedCount} unverified (registry size ${matDebug.registrySize}).`,
+          },
+        };
+
         const debug = {
-          orchestrator: { origin, evidenceWeak, usedFallback },
-          literature: lit.json?.debug ?? { error: lit.error, status: lit.status },
-          protocols: proto.json?.debug ?? { error: proto.error, status: proto.status },
-          materials: mat.json?.debug ?? { error: mat.error, status: mat.status },
+          orchestrator: { evidenceWeak, usedFallback },
+          literature: litDebug,
+          protocols: protoDebug,
+          materials: matDebug,
         };
 
         return jsonResponse({
@@ -399,6 +336,7 @@ export const Route = createFileRoute("/api/generate-plan")({
           risks: defaultRisks(),
           scientist_review_questions,
           judge_presentation_view,
+          source_status,
           warnings: {
             evidence_weak: evidenceWeak,
             uses_fallback_literature: usedFallback.literature,
