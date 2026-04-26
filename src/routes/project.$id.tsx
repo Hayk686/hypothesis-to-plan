@@ -22,6 +22,7 @@ import { searchLiterature, type DataSource } from "@/lib/services";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { TechStackPanel } from "@/components/TechStackPanel";
 import { LabReadinessCard } from "@/components/LabReadinessCard";
+import { ScientistFeedbackPanel } from "@/components/ScientistFeedbackPanel";
 import { computeLabReadiness } from "@/lib/labReadiness";
 
 export const Route = createFileRoute("/project/$id")({
