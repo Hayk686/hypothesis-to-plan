@@ -449,7 +449,10 @@ function ProjectPage() {
 
           {/* VALIDATION */}
           <TabsContent value="validation" className="mt-6 space-y-4">
-            <SectionHeader title="Validation plan" subtitle="Primary endpoint, secondary metrics, statistical approach, controls, reproducibility" />
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <SectionHeader title="Validation plan" subtitle="Primary endpoint, secondary metrics, statistical approach, controls, reproducibility" />
+              <VerificationBadge verification={plan.validation.source} />
+            </div>
 
             <Card className="border-primary/30 bg-primary/5 p-6">
               <div className="mb-2 flex items-center gap-2">
