@@ -728,7 +728,7 @@ function ProjectPage() {
           </TabsContent>
         </Tabs>
 
-        <div className="mt-8">
+        <div id="scientist-review" className="mt-8 scroll-mt-24">
           <ScientistFeedbackPanel experimentType={deriveExperimentType(project)} />
         </div>
       </div>
