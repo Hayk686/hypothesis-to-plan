@@ -577,7 +577,7 @@ export const DEMO_PLAN: GeneratedPlan = {
   ),
 };
 
-const STORAGE_KEY = "h2p_projects_v2";
+const STORAGE_KEY = "h2p_projects_v3_trehalose";
 
 export function loadProjects(): Project[] {
   if (typeof window === "undefined") return [];
