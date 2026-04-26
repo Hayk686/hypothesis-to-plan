@@ -168,14 +168,26 @@ function ProjectPage() {
             <StatCard label="Estimated Duration" value={`${plan.timeline.length} wks`} helper={`${plan.protocol.length} protocol phases`} />
           </div>
 
-          {/* Verification banner */}
-          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
-            <VerificationBadge verification={{ status: "pending" }} />
-            <span className="text-foreground/80">
-              Demo data is seeded for layout — every literature reference, protocol source, and catalog number is marked
-              <span className="font-mono"> pending verification</span> until a real source is attached.
-            </span>
-          </div>
+          {/* Literature QC banner */}
+          {plan.literatureQc ? (
+            <div className="mt-4 flex flex-wrap items-start gap-3 rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
+              <Badge
+                variant="outline"
+                className="shrink-0 gap-1 border-primary/40 bg-primary/10 font-mono text-[10px] uppercase tracking-wider text-primary"
+              >
+                <FileSearch className="h-3 w-3" /> Literature QC: {plan.literatureQc.result}
+              </Badge>
+              <span className="min-w-0 flex-1 text-foreground/80">{plan.literatureQc.reason}</span>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
+              <VerificationBadge verification={{ status: "pending" }} />
+              <span className="text-foreground/80">
+                Demo data is seeded for layout — every literature reference, protocol source, and catalog number is marked
+                <span className="font-mono"> pending verification</span> until a real source is attached.
+              </span>
+            </div>
+          )}
         </Card>
 
         {/* Tabs */}
@@ -219,16 +231,32 @@ function ProjectPage() {
                     <Badge variant="secondary" className="bg-primary/10 text-primary">
                       {Math.round(paper.similarity * 100)}% relevance
                     </Badge>
-                    <span className="font-mono text-xs text-muted-foreground">{paper.citations} cites</span>
-                    <a
-                      href={`https://doi.org/${paper.doi}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-xs text-primary hover:underline"
-                    >
-                      DOI <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
+                    {paper.citations > 0 && (
+                      <span className="font-mono text-xs text-muted-foreground">{paper.citations} cites</span>
+                    )}
+                    {(() => {
+                      const href = paper.verification?.sourceUrl
+                        ?? (paper.doi.startsWith("http") ? paper.doi : `https://doi.org/${paper.doi}`);
+                      return (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center text-xs text-primary hover:underline"
+                        >
+                          Open source <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      );
+                    })()}
                     <VerificationBadge verification={paper.verification} />
+                    {paper.verification?.note?.toLowerCase().startsWith("supporting source") && (
+                      <Badge
+                        variant="outline"
+                        className="border-warning/40 bg-warning/10 font-mono text-[10px] uppercase tracking-wider text-warning-foreground"
+                      >
+                        Supporting source
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -390,8 +418,22 @@ function ProjectPage() {
                               >
                                 Catalog: {CATALOG_VERIFY_REQUIRED}
                               </Badge>
+                            ) : m.verification?.sourceUrl ? (
+                              <a
+                                href={m.verification.sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-xs text-primary hover:underline"
+                              >
+                                {m.catalog}
+                              </a>
                             ) : (
                               <div className="font-mono text-xs text-muted-foreground">{m.catalog}</div>
+                            )}
+                            {!needsCatalog && m.verification?.note?.toLowerCase().includes("verify before ordering") && (
+                              <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-warning-foreground/80">
+                                Verify before ordering
+                              </div>
                             )}
                           </TableCell>
                           <TableCell className="text-sm">{m.quantity}</TableCell>
@@ -656,14 +698,22 @@ function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget
   L.push(`- **Estimated Cost:** $${totalBudget.toLocaleString()}`);
   L.push(`- **Estimated Duration:** ${plan.timeline.length} weeks`);
 
+  if (plan.literatureQc) {
+    hr();
+    L.push(`## Literature QC`);
+    L.push(`- **Result:** ${plan.literatureQc.result}`);
+    L.push(`- **Reason:** ${plan.literatureQc.reason}`);
+  }
+
   hr();
   L.push(`## Evidence — related work (${plan.papers.length} papers)`);
-  L.push(`\n_Note: every reference is marked with a verification status. Replace ${"`pending`"} entries with verified Semantic Scholar / DOI sources before publishing._`);
   plan.papers.forEach((p, i) => {
+    const url = p.verification?.sourceUrl ?? (p.doi.startsWith("http") ? p.doi : `https://doi.org/${p.doi}`);
     L.push(`\n### ${i + 1}. ${p.title}`);
     L.push(`- _${p.authors} · ${p.venue} · ${p.year}_`);
-    L.push(`- Relevance: ${Math.round(p.similarity * 100)}% · Citations: ${p.citations} · DOI: ${p.doi}`);
-    L.push(`- **Source verification:** \`${p.verification.status}\`${p.verification.note ? ` — ${p.verification.note}` : ""}`);
+    L.push(`- Relevance: ${Math.round(p.similarity * 100)}%${p.citations > 0 ? ` · Citations: ${p.citations}` : ""}`);
+    L.push(`- Source: ${url}`);
+    L.push(`- **Verification:** \`${p.verification.status}\`${p.verification.note ? ` — ${p.verification.note}` : ""}`);
     L.push(`- **Abstract:** ${p.abstract}`);
     L.push(`- **Why it matters:** ${p.whyItMatters}`);
   });

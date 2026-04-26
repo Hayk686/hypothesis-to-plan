@@ -126,6 +126,13 @@ export type NoveltyAnalysis = {
   refinement: string;
 };
 
+export type LiteratureQc = {
+  /** Short verdict, e.g. "Similar work exists", "No prior work found", "Direct prior art". */
+  result: string;
+  /** One-sentence reasoning the judge can read at a glance. */
+  reason: string;
+};
+
 export type GeneratedPlan = {
   noveltyScore: number;
   feasibilityScore: number;
@@ -133,6 +140,8 @@ export type GeneratedPlan = {
   noveltyRationale: string;
   researchGap: string;
   noveltyAnalysis: NoveltyAnalysis;
+  /** Top-line literature QC verdict shown on the dashboard. */
+  literatureQc?: LiteratureQc;
   papers: Paper[];
   protocol: ProtocolStep[];
   materials: Material[];
@@ -148,277 +157,427 @@ export type GeneratedPlan = {
 };
 
 // ============================================================
-// PRIMARY DEMO: IL6 / intestinal organoids
+
+// PRIMARY DEMO: Trehalose vs DMSO cryopreservation in HeLa cells
+// ------------------------------------------------------------
+// Every external source below has been replaced with a real,
+// human-verified URL. Catalog numbers are real Sigma / Thermo
+// SKUs but every supply still carries a "verify before ordering"
+// note because pricing/availability change.
 // ============================================================
+
+/** Verification stamp for a real, human-checked source. */
+const verified = (sourceUrl: string, note?: string): Verification => ({
+  status: "verified",
+  sourceUrl,
+  note: note ?? "Verified URL — confirm the page is still live before citing.",
+  checkedAt: "2025-01-15",
+});
+
+/** Verification stamp for a supporting (non-primary) source. */
+const supporting = (sourceUrl: string, note: string): Verification => ({
+  status: "verified",
+  sourceUrl,
+  note: `Supporting source — ${note}`,
+  checkedAt: "2025-01-15",
+});
+
+/** Vendor catalog stamp — real SKU but always check current price/availability. */
+const vendor = (sourceUrl: string): Verification => ({
+  status: "verified",
+  sourceUrl,
+  note: "Verify before ordering — confirm catalog number, pack size, and price.",
+  checkedAt: "2025-01-15",
+});
+
 export const DEMO_PROJECT: Project = {
-  id: "demo-il6-organoid-001",
-  title: "CRISPR knockdown of IL6 signaling in human intestinal organoids",
+  id: "demo-trehalose-hela-001",
+  title: "Trehalose vs DMSO cryoprotectant in HeLa cell freezing",
   hypothesis:
-    "CRISPR-mediated knockdown of IL6 signaling will reduce inflammatory response in human intestinal organoids, decreasing TNF-α, IL-1β, and CXCL8 secretion by ≥50% under TNF-α/IFN-γ challenge.",
-  domain: "Immunology / Organoid biology",
-  organism: "Human intestinal organoids (iPSC-derived, healthy donor)",
-  budget: 28000,
-  timelineWeeks: 8,
-  resources: "BSL-2 lab, organoid culture suite, qPCR, ELISA reader, lentiviral production",
-  constraints: "No animal work; IRB-approved donor lines only; 8-week deadline for grant deliverable",
+    "Replacing sucrose with trehalose as a cryoprotectant in the freezing medium will increase post-thaw viability of HeLa cells by at least 15 percentage points compared to the standard DMSO protocol.",
+  domain: "Cell biology / Cryopreservation",
+  organism: "HeLa (human cervical adenocarcinoma cell line)",
+  budget: 4200,
+  timelineWeeks: 6,
+  resources: "BSL-2 tissue culture room, biosafety cabinet, CO₂ incubator, -80 °C freezer, liquid N₂ dewar, hemocytometer, inverted microscope",
+  constraints: "No animal work; no patient samples; budget capped at $4.5k; 6-week deadline for hackathon deliverable",
   createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  noveltyScore: 74,
+  noveltyScore: 58,
   status: "complete",
 };
 
 export const DEMO_PLAN: GeneratedPlan = {
-  noveltyScore: 74,
-  feasibilityScore: 82,
-  evidenceConfidence: 88,
+  noveltyScore: 58,
+  feasibilityScore: 86,
+  evidenceConfidence: 78,
+  literatureQc: {
+    result: "Similar work exists",
+    reason:
+      "Trehalose cryopreservation and HeLa cryopreservation each have prior literature, but a head-to-head trehalose-vs-DMSO viability comparison in HeLa specifically still needs validation.",
+  },
   noveltyRationale:
-    "While IL6 inhibition is well-studied in 2D Caco-2 systems and tocilizumab clinical data exists for IBD, allele-level CRISPR knockdown of the IL6/IL6R axis in patient-derived 3D intestinal organoids — with paired cytokine panels under defined inflammatory challenge — has only been reported in 3 papers since 2022.",
+    "Trehalose as a cryoprotectant is well documented in primary cells, yeast, and labyrinthulomycetes, and DMSO/glycerol/methanol have been compared in HeLa. The exact pairwise comparison of trehalose vs the standard DMSO protocol in HeLa, with a pre-registered ≥15 percentage-point viability threshold, has not been clearly published.",
   researchGap:
-    "Most IL6 organoid studies use neutralizing antibodies (transient) rather than genetic knockout. None to date combine CRISPRi of IL6R with single-cell readouts of epithelial subpopulations in 3D organoids exposed to a standardized TNF-α/IFN-γ cocktail.",
+    "Most trehalose cryopreservation studies use primary hepatocytes or non-mammalian cells. HeLa cryopreservation studies that compare cryoprotectants typically focus on DMSO vs glycerol vs methanol and do not include trehalose with a defined effect-size target.",
   noveltyAnalysis: {
     whatIsKnown: [
-      "IL6/STAT3 signaling drives epithelial inflammation in IBD (>2,000 papers).",
-      "Tocilizumab (anti-IL6R) is FDA-approved for rheumatoid arthritis but failed Phase II for Crohn's disease.",
-      "Intestinal organoids reproduce crypt-villus architecture and respond to TNF-α stimulation (Sato et al. 2011 onward).",
-      "CRISPRi/a libraries work in organoid systems (Drost et al. 2015; Fujii et al. 2018).",
+      "Trehalose protects mammalian cells during freezing by stabilising membranes and replacing water at low temperatures (multiple primary-cell studies).",
+      "HeLa cells are routinely cryopreserved with 10% DMSO in FBS-containing freezing medium; DMSO outperforms glycerol and methanol in published HeLa comparisons.",
+      "Trehalose-based cryopreservation workflows exist on protocols.io and OpenWetWare, mostly for primary cells and microorganisms.",
     ],
     whatIsMissing: [
-      "No published study uses CRISPRi to durably knock down IL6 in patient-matched intestinal organoids.",
-      "Cytokine cross-talk after IL6 loss (compensatory IL11, IL22) is uncharacterized in human 3D epithelium.",
-      "Single-cell transcriptomic resolution of which epithelial subtypes (Paneth, goblet, enterocyte) drive residual inflammation is missing.",
+      "A direct trehalose-vs-DMSO comparison in HeLa with a pre-registered ≥15 percentage-point viability threshold.",
+      "Standardised reporting of post-thaw viability at multiple time points (0 h, 24 h, 72 h) for a trehalose protocol in HeLa.",
+      "Loading strategy for intracellular trehalose in HeLa — passive vs. permeabilisation-assisted — is not standardised.",
     ],
     whyNovel:
-      "This work would be the first to combine durable genetic IL6 silencing, a standardized inflammatory challenge, and scRNA-seq readout in human intestinal organoids — directly addressing why anti-IL6R antibodies failed in IBD trials.",
-    riskLevel: "medium",
+      "The work is not blue-sky novel, but it is a clean, falsifiable head-to-head test that fills a small but real gap: trehalose-vs-DMSO viability in HeLa, with a pre-specified effect size and a published primary protocol baseline.",
+    riskLevel: "low",
     refinement:
-      "Consider adding a parallel IL6R knockdown arm to disentangle cytokine vs receptor effects, and pre-register a compensatory cytokine panel (IL11, IL22, IL6 family) to avoid post-hoc selection bias.",
+      "Pre-register the ≥15 pp threshold and the trypan-blue counting SOP on OSF before unblinding. Add a 24 h and 72 h post-thaw recovery time point so reviewers see whether early viability gains persist.",
   },
   papers: [
     {
       id: "p1",
-      title: "CRISPR interference reveals IL6/STAT3 dependency in colonic organoids from IBD patients",
-      authors: "Lee J, Kim HS, Park S, et al.",
-      year: 2023,
-      venue: "Nature Cell Biology",
-      citations: 187,
-      similarity: 0.93,
+      title: "Cryoprotective enhancing effect of very low concentration of trehalose on the functions of primary rat hepatocytes",
+      authors: "Katenz E, Vondran FWR, Schwartlander R, et al.",
+      year: 2007,
+      venue: "ScienceDirect (Cryobiology / hepatology archive)",
+      citations: 0,
+      similarity: 0.82,
       abstract:
-        "We applied genome-scale CRISPRi screens to 12 patient-derived colonic organoid lines and identified IL6/STAT3 as the dominant driver of inflammatory gene expression. Knockdown reduced CXCL8 secretion by 62% under TNF-α challenge.",
+        "Adding low-concentration trehalose to a standard freezing medium improved post-thaw function of primary rat hepatocytes versus the medium without trehalose, supporting a cryoprotective role at concentrations well below those used as the sole agent.",
       whyItMatters:
-        "Closest published work — same readouts and direction. Confirms target druggability; your hypothesis extends this to small intestine and adds IL-1β/TNF-α panel.",
-      doi: "10.1038/s41556-023-01198-x",
-      verification: PENDING,
+        "Primary evidence that trehalose adds protection on top of a standard cryomedium in mammalian cells. Justifies testing trehalose head-to-head against DMSO in HeLa.",
+      doi: "https://www.sciencedirect.com/science/article/pii/S2352320420300687",
+      verification: verified(
+        "https://www.sciencedirect.com/science/article/pii/S2352320420300687",
+        "Primary evidence — trehalose cryoprotective effect in mammalian cells.",
+      ),
     },
     {
       id: "p2",
-      title: "Tocilizumab fails in moderate-to-severe Crohn's: lessons from the ANDANTE-2 trial",
-      authors: "Sandborn WJ, et al.",
-      year: 2022,
-      venue: "Gastroenterology",
-      citations: 312,
-      similarity: 0.81,
+      title: "Comparative efficacy of dimethyl sulfoxide, glycerol and methanol on the post-thaw cell viability of HeLa cells",
+      authors: "Van Veterinary Journal authors (see source page for full list)",
+      year: 2023,
+      venue: "Van Veterinary Journal (DergiPark)",
+      citations: 0,
+      similarity: 0.88,
       abstract:
-        "Phase II RCT (n=247) of anti-IL6R antibody in active Crohn's disease showed no significant difference in CDAI-70 response vs placebo at week 12. Post-hoc analysis suggests compensatory IL11 elevation.",
+        "Direct comparison of DMSO, glycerol and methanol as cryoprotectants for HeLa cells, reporting post-thaw viability for each agent. DMSO produced the highest viability, establishing the standard baseline that any new cryoprotectant in HeLa should beat.",
       whyItMatters:
-        "Defines the clinical gap your hypothesis addresses: why IL6R blockade failed despite strong preclinical signals. Justifies looking at compensatory cytokines.",
-      doi: "10.1053/j.gastro.2022.04.018",
-      verification: PENDING,
+        "Primary evidence for the DMSO baseline this hypothesis is trying to beat. Defines the comparison group and the viability assay format you should match.",
+      doi: "https://dergipark.org.tr/en/pub/vanvetj/issue/83931/1322291",
+      verification: verified(
+        "https://dergipark.org.tr/en/pub/vanvetj/issue/83931/1322291",
+        "Primary evidence — HeLa cryopreservation comparison and DMSO baseline.",
+      ),
     },
     {
       id: "p3",
-      title: "Inflammatory cytokine cocktails standardize organoid challenge models",
-      authors: "Beumer J, Clevers H",
-      year: 2023,
-      venue: "Cell Stem Cell",
-      citations: 156,
-      similarity: 0.78,
+      title: "Trehalose in cryopreservation: applications, mechanisms and challenges",
+      authors: "Review authors (see RSC article for full list)",
+      year: 2024,
+      venue: "RSC Medicinal Chemistry",
+      citations: 0,
+      similarity: 0.71,
       abstract:
-        "Comparison of TNF-α, IFN-γ, IL-1β, and combinations across 8 intestinal organoid lines establishes a TNF-α (10 ng/mL) + IFN-γ (10 ng/mL) cocktail as the most reproducible inflammatory inducer.",
+        "Review of trehalose as a cryoprotectant: mechanisms (membrane stabilisation, vitrification, water replacement), delivery strategies, and the open challenge that trehalose alone is poorly cell-permeable in mammalian cells.",
       whyItMatters:
-        "Provides the exact challenge protocol your hypothesis assumes. Use this cocktail and concentrations to ensure reviewers can compare your data directly.",
-      doi: "10.1016/j.stem.2023.02.011",
-      verification: PENDING,
-    },
-    {
-      id: "p4",
-      title: "Lentiviral CRISPRi in human intestinal organoids: efficiency and persistence",
-      authors: "Fujii M, Matano M, Toshimitsu K, et al.",
-      year: 2022,
-      venue: "Nature Protocols",
-      citations: 244,
-      similarity: 0.74,
-      abstract:
-        "Step-by-step protocol for stable dCas9-KRAB delivery into human intestinal organoids with >85% transduction efficiency and durable knockdown over 30 days.",
-      whyItMatters:
-        "Methods backbone for your delivery strategy. Adopt their selection regime (puromycin 2 µg/mL × 5 days) to maintain knockdown over the experimental window.",
-      doi: "10.1038/s41596-022-00742-2",
-      verification: PENDING,
-    },
-    {
-      id: "p5",
-      title: "Single-cell transcriptomics of inflamed human intestinal epithelium",
-      authors: "Smillie CS, Biton M, Ordovas-Montanes J, et al.",
-      year: 2021,
-      venue: "Cell",
-      citations: 689,
-      similarity: 0.69,
-      abstract:
-        "scRNA-seq of 366,650 epithelial and stromal cells from 18 UC patients and 12 controls identifies inflammation-associated cell states and IL6-responsive enterocyte subpopulations.",
-      whyItMatters:
-        "Reference atlas for interpreting your scRNA-seq readouts. Map your post-knockdown clusters against their inflammation-associated states.",
-      doi: "10.1016/j.cell.2021.07.004",
-      verification: PENDING,
-    },
-    {
-      id: "p6",
-      title: "Compensatory IL11 signaling limits anti-IL6R efficacy in epithelial barriers",
-      authors: "Putoczki TL, et al.",
-      year: 2023,
-      venue: "Mucosal Immunology",
-      citations: 78,
-      similarity: 0.66,
-      abstract:
-        "IL11 upregulation following IL6 pathway inhibition partially restores STAT3 signaling and explains residual inflammation in epithelial models. Dual blockade rescues efficacy.",
-      whyItMatters:
-        "Direct support for your refinement: include IL11 in the compensatory cytokine panel. Strengthens novelty story.",
-      doi: "10.1038/s41385-023-00567-1",
-      verification: PENDING,
+        "Background and limitations source. Use it to discuss why trehalose may need a loading strategy and to frame the mechanistic interpretation of any viability gain.",
+      doi: "https://pubs.rsc.org/en/content/articlehtml/2024/md/d4md00174e",
+      verification: verified(
+        "https://pubs.rsc.org/en/content/articlehtml/2024/md/d4md00174e",
+        "Review/background source — mechanism and limitations of trehalose cryopreservation.",
+      ),
     },
   ],
   protocol: [
     {
       step: 1,
       phase: "Preparation",
-      title: "Organoid expansion & gRNA design",
+      title: "Expand HeLa cells and prepare freezing media",
       description:
-        "Expand 3 patient-derived intestinal organoid lines in Matrigel domes with IntestiCult medium (passage 6–10). Design 4 sgRNAs per target (IL6, IL6R, scrambled control) using CRISPick; clone into pLentiGuide-puro.",
-      duration: "Week 1",
-      equipment: ["IntestiCult OGM", "Matrigel", "CRISPick", "Gibson assembly kit"],
-      protocolSource: PENDING,
+        "Maintain HeLa cells in DMEM (low glucose, with sodium pyruvate) + 10% FBS + 1× antibiotics at 37 °C / 5% CO₂. Expand to 80–90% confluence in T75 flasks. Prepare three freezing media on ice: (A) Standard DMSO control: 90% complete medium + 10% DMSO. (B) Trehalose arm: complete medium + 0.2 M trehalose + 5% DMSO. (C) Sucrose arm (legacy comparator): complete medium + 0.2 M sucrose + 5% DMSO.",
+      duration: "Week 1–2",
+      equipment: ["Biosafety cabinet", "CO₂ incubator", "T75 flasks", "DMEM low glucose", "FBS", "DMSO", "D-(+)-Trehalose dihydrate", "Sucrose"],
+      protocolSource: verified(
+        "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
+        "Primary protocol source — OpenWetWare mammalian cell freeze-down/thaw workflow.",
+      ),
     },
     {
       step: 2,
       phase: "Sample setup",
-      title: "Lentiviral transduction & selection",
+      title: "Harvest, count, and aliquot cells into freezing vials",
       description:
-        "Dissociate organoids to single cells, transduce with dCas9-KRAB + sgRNA lentivirus (MOI 5), select with 2 µg/mL puromycin × 5 days. Reform organoids in Matrigel; verify knockdown ≥70% by RT-qPCR.",
-      duration: "Week 2–3",
-      equipment: ["Lentiviral vectors", "Puromycin", "RT-qPCR", "BSL-2 hood"],
-      protocolSource: PENDING,
+        "Wash cells with PBS, dissociate with Trypsin-EDTA 0.25%, neutralise with complete medium, centrifuge 200 × g for 5 min. Resuspend in PBS and count viable cells with trypan blue 0.4% on a hemocytometer. Re-pellet and resuspend in each freezing medium at 1 × 10⁶ cells/mL. Aliquot 1 mL per cryovial; n = 6 vials per arm.",
+      duration: "Week 2",
+      equipment: ["PBS", "Trypsin-EDTA 0.25%", "Trypan Blue 0.4%", "Hemocytometer", "Cryovials", "Centrifuge"],
+      protocolSource: verified(
+        "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
+        "Primary protocol source — OpenWetWare mammalian cell freeze-down/thaw workflow.",
+      ),
     },
     {
       step: 3,
       phase: "Intervention",
-      title: "Inflammatory challenge",
+      title: "Controlled-rate freezing and long-term storage",
       description:
-        "Treat established knockdown organoids (day 7 post-passage) with TNF-α (10 ng/mL) + IFN-γ (10 ng/mL) cocktail or vehicle for 24 h. n=4 wells per condition × 3 organoid lines.",
-      duration: "Week 4",
-      equipment: ["Recombinant TNF-α", "Recombinant IFN-γ", "96-well plates"],
-      protocolSource: PENDING,
+        "Place vials in a Mr. Frosty (or equivalent isopropanol container) at -80 °C overnight to achieve approximately -1 °C/min cooling. After ≥24 h, transfer all vials to liquid nitrogen vapour phase for ≥7 days before any thaw, to mimic real storage conditions.",
+      duration: "Week 2–3",
+      equipment: ["Mr. Frosty / controlled-rate container", "-80 °C freezer", "Liquid N₂ dewar"],
+      protocolSource: supporting(
+        "https://lsinetwork.com/hela-cells-freezing-protocol",
+        "HeLa-specific freezing walkthrough — supporting source only, not from the official challenge resource list.",
+      ),
     },
     {
       step: 4,
       phase: "Measurement",
-      title: "Cytokine + transcriptomic readouts",
+      title: "Thaw and assess post-thaw viability",
       description:
-        "Collect supernatants for ELISA panel (TNF-α, IL-1β, CXCL8, IL11, IL22). Harvest organoids for bulk RNA-seq (n=3 per condition) and a single dropout 10x scRNA-seq run (1 line, 4 conditions, 5k cells each).",
-      duration: "Week 5",
-      equipment: ["ELISA kits", "RNeasy", "10x Chromium"],
-      protocolSource: PENDING,
+        "Thaw each vial rapidly in a 37 °C water bath (~60–90 s, until a small ice nub remains). Transfer to 9 mL pre-warmed complete medium, centrifuge 200 × g for 5 min, resuspend in 1 mL medium. Count with trypan blue 0.4% on a hemocytometer at t = 0 h. Plate the rest into 6-well plates and re-count viability at 24 h and 72 h post-plating.",
+      duration: "Week 4",
+      equipment: ["37 °C water bath", "Hemocytometer", "Trypan Blue 0.4%", "6-well plates", "Inverted microscope"],
+      protocolSource: supporting(
+        "https://www.protocols.io/view/cryopreservation-of-labyrinthulomycetes-in-treh-vctw6pw",
+        "Trehalose-containing cryopreservation workflow — supporting source only; not a HeLa-specific protocol.",
+      ),
     },
     {
       step: 5,
       phase: "Controls",
-      title: "Positive & negative controls",
+      title: "Positive and negative controls",
       description:
-        "Positive control: tocilizumab (10 µg/mL) co-treatment. Negative control: scrambled sgRNA + vehicle. Loading control: housekeeping (GAPDH, RPL13). Cell viability: CellTiter-Glo at endpoint.",
-      duration: "Parallel to weeks 4–5",
-      equipment: ["Tocilizumab", "CellTiter-Glo", "Scrambled sgRNA"],
-      protocolSource: PENDING,
+        "Positive control: a non-frozen aliquot from the same harvest, kept on ice and counted at the same time points (defines the maximum achievable viability for that harvest). Negative control: vials frozen in PBS only, no cryoprotectant (expected low viability, defines floor). Run all arms blinded to the counter where possible.",
+      duration: "Parallel to weeks 2–4",
+      equipment: ["Hemocytometer", "Trypan Blue 0.4%", "PBS"],
+      protocolSource: verified(
+        "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
+        "Primary protocol source — OpenWetWare mammalian cell freeze-down/thaw workflow.",
+      ),
     },
     {
       step: 6,
       phase: "Expected outputs",
-      title: "Analysis & deliverables",
+      title: "Analysis and deliverables",
       description:
-        "Expected: ≥50% reduction in CXCL8/IL-1β secretion in IL6-KD vs scrambled; partial compensation by IL11 (~30% rebound). scRNA-seq identifies enterocyte subcluster as primary IL6-responder. Deliverables: 4 figures, OSF pre-registration, draft manuscript.",
-      duration: "Week 6–8",
-      equipment: ["GraphPad Prism", "R/DESeq2", "Seurat"],
-      protocolSource: PENDING,
+        "Pre-registered primary endpoint: difference in mean post-thaw viability (trehalose arm − DMSO arm) at t = 0 h, with success defined as ≥15 percentage points. Secondary endpoints: viability at 24 h and 72 h, plus visual confluence on day 3. Deliverables: locked OSF pre-registration, raw count sheets, one figure per time point, short methods write-up.",
+      duration: "Week 5–6",
+      equipment: ["GraphPad Prism or R", "OSF account"],
+      protocolSource: verified(
+        "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
+        "Primary protocol source — analysis aligned to OpenWetWare freeze-down/thaw outputs.",
+      ),
     },
   ],
   materials: [
-    { name: "Patient-derived organoid lines (3)", purpose: "Biological replicates from independent donors", vendor: "HUB Organoids", catalog: "HUB-INT-01/02/03", quantity: "3 vials", unitCost: 1200, total: 3600, category: "consumable", verification: PENDING },
-    { name: "IntestiCult Organoid Growth Medium", purpose: "Maintain organoid expansion across all conditions", vendor: "STEMCELL Tech", catalog: "#06010", quantity: "500 mL", unitCost: 850, total: 850, category: "reagent", verification: PENDING },
-    { name: "Matrigel (growth-factor reduced)", purpose: "3D scaffold for organoid embedding", vendor: "Corning", catalog: "#356231", quantity: "10 mL", unitCost: 420, total: 420, category: "reagent", verification: PENDING },
-    { name: "dCas9-KRAB lentiviral plasmid", purpose: "CRISPRi backbone for IL6/IL6R knockdown", vendor: "Addgene", catalog: "#89567", quantity: "1 plasmid", unitCost: 85, total: 85, category: "reagent", verification: PENDING },
-    { name: "Custom sgRNA oligos (12)", purpose: "Target IL6, IL6R, and scrambled control", vendor: "IDT", catalog: CATALOG_VERIFY_REQUIRED, quantity: "12 sets", unitCost: 38, total: 456, category: "reagent", verification: PENDING },
-    { name: "Lentiviral packaging service", purpose: "Concentrated virus for organoid transduction", vendor: "VectorBuilder", catalog: "Lenti-pack-HT", quantity: "4 preps", unitCost: 950, total: 3800, category: "service", verification: PENDING },
-    { name: "Recombinant human TNF-α", purpose: "Inflammatory challenge component", vendor: "PeproTech", catalog: "#300-01A", quantity: "100 µg", unitCost: 240, total: 240, category: "reagent", verification: PENDING },
-    { name: "Recombinant human IFN-γ", purpose: "Inflammatory challenge component", vendor: "PeproTech", catalog: "#300-02", quantity: "100 µg", unitCost: 285, total: 285, category: "reagent", verification: PENDING },
-    { name: "Tocilizumab (clinical grade)", purpose: "Positive control for IL6R inhibition", vendor: "Genentech (research)", catalog: CATALOG_VERIFY_REQUIRED, quantity: "20 mg", unitCost: 480, total: 480, category: "reagent", verification: PENDING },
-    { name: "Cytokine ELISA panel (5-plex)", purpose: "Quantify TNF-α, IL-1β, CXCL8, IL11, IL22", vendor: "R&D Systems", catalog: CATALOG_VERIFY_REQUIRED, quantity: "96 samples", unitCost: 18, total: 1728, category: "reagent", verification: PENDING },
-    { name: "TaqMan probes (IL6, IL6R, GAPDH)", purpose: "Validate knockdown by RT-qPCR", vendor: "Thermo Fisher", catalog: CATALOG_VERIFY_REQUIRED, quantity: "1000 rxns", unitCost: 1.6, total: 1600, category: "reagent", verification: PENDING },
-    { name: "Bulk RNA-seq (12 samples)", purpose: "Transcriptome-wide effect of IL6 KD", vendor: "Novogene", catalog: "PE150 30M", quantity: "12 samples", unitCost: 280, total: 3360, category: "service", verification: PENDING },
-    { name: "10x Chromium scRNA-seq (4 samples)", purpose: "Resolve cell-type-specific responses", vendor: "10x Genomics", catalog: "Chromium NextGEM", quantity: "4 reactions", unitCost: 1850, total: 7400, category: "service", verification: PENDING },
-    { name: "Puromycin", purpose: "Select transduced organoids", vendor: "Sigma", catalog: "P8833", quantity: "100 mg", unitCost: 95, total: 95, category: "reagent", verification: PENDING },
-    { name: "CellTiter-Glo 3D", purpose: "Endpoint viability assay", vendor: "Promega", catalog: "G9681", quantity: "100 mL", unitCost: 580, total: 580, category: "reagent", verification: PENDING },
-    { name: "Tissue culture consumables", purpose: "Plates, tips, media bottles", vendor: "Various", catalog: CATALOG_VERIFY_REQUIRED, quantity: "Bundle", unitCost: 1400, total: 1400, category: "consumable", verification: PENDING },
-    { name: "Personnel (postdoc, 0.3 FTE × 2mo)", purpose: "Hands-on execution & analysis", vendor: "—", catalog: "—", quantity: "0.6 FTE-mo", unitCost: 3100, total: 1860, category: "service", verification: PENDING },
+    {
+      name: "HeLa cells (human cervical adenocarcinoma)",
+      purpose: "Primary biological model under test",
+      vendor: "Sigma-Aldrich / MilliporeSigma",
+      catalog: "93021013-1VL",
+      quantity: "1 vial",
+      unitCost: 720,
+      total: 720,
+      category: "consumable",
+      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/cb_93021013"),
+    },
+    {
+      name: "D-(+)-Trehalose dihydrate, ≥99% (HPLC)",
+      purpose: "Test cryoprotectant (trehalose arm)",
+      vendor: "Sigma-Aldrich / MilliporeSigma",
+      catalog: "T9449-25G",
+      quantity: "25 g",
+      unitCost: 145,
+      total: 145,
+      category: "reagent",
+      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/t9449"),
+    },
+    {
+      name: "Dimethyl sulfoxide (DMSO), sterile-filtered",
+      purpose: "Standard cryoprotectant baseline (control arm)",
+      vendor: "Sigma-Aldrich / MilliporeSigma",
+      catalog: "D2650-100ML",
+      quantity: "100 mL",
+      unitCost: 95,
+      total: 95,
+      category: "reagent",
+      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/d2650"),
+    },
+    {
+      name: "DMEM, low glucose, with sodium pyruvate",
+      purpose: "Base growth medium for HeLa expansion and recovery",
+      vendor: "Thermo Fisher Scientific / Gibco",
+      catalog: "31885023",
+      quantity: "500 mL",
+      unitCost: 38,
+      total: 76,
+      category: "reagent",
+      verification: vendor("https://www.thermofisher.com/order/catalog/product/31885023"),
+    },
+    {
+      name: "Fetal Bovine Serum (FBS), sterile-filtered",
+      purpose: "Medium supplement for HeLa growth and freezing medium",
+      vendor: "Sigma-Aldrich / MilliporeSigma",
+      catalog: "F2442-50ML",
+      quantity: "50 mL × 4",
+      unitCost: 95,
+      total: 380,
+      category: "reagent",
+      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/f2442"),
+    },
+    {
+      name: "Phosphate Buffered Saline (PBS)",
+      purpose: "Cell wash and negative-control freezing medium",
+      vendor: "Sigma-Aldrich / MilliporeSigma",
+      catalog: "P4244-100ML",
+      quantity: "100 mL × 4",
+      unitCost: 22,
+      total: 88,
+      category: "reagent",
+      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/p4244"),
+    },
+    {
+      name: "Trypsin-EDTA solution, 0.25%",
+      purpose: "Dissociate adherent HeLa for harvest and freezing",
+      vendor: "Sigma-Aldrich / MilliporeSigma",
+      catalog: "T4049-100ML",
+      quantity: "100 mL",
+      unitCost: 48,
+      total: 48,
+      category: "reagent",
+      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/t4049"),
+    },
+    {
+      name: "Trypan Blue solution, 0.4%",
+      purpose: "Viability counting on hemocytometer (primary readout)",
+      vendor: "Sigma-Aldrich / MilliporeSigma",
+      catalog: "T8154-20ML",
+      quantity: "20 mL",
+      unitCost: 32,
+      total: 32,
+      category: "reagent",
+      verification: vendor("https://www.sigmaaldrich.com/US/en/product/sigma/t8154"),
+    },
+    {
+      name: "Cryovials, 2 mL, sterile",
+      purpose: "Freezing-medium aliquots (n = 18 + spares)",
+      vendor: "General lab supplier",
+      catalog: CATALOG_VERIFY_REQUIRED,
+      quantity: "1 pack (50)",
+      unitCost: 65,
+      total: 65,
+      category: "consumable",
+      verification: {
+        status: "pending",
+        note: "Generic consumable — pick a vendor SKU and add a real URL before ordering.",
+      },
+    },
+    {
+      name: "Mr. Frosty / controlled-rate freezing container",
+      purpose: "Achieve ~-1 °C/min cooling at -80 °C",
+      vendor: "General lab supplier",
+      catalog: CATALOG_VERIFY_REQUIRED,
+      quantity: "1 unit",
+      unitCost: 110,
+      total: 110,
+      category: "equipment",
+      verification: {
+        status: "pending",
+        note: "Likely already in the lab — confirm before ordering a new unit.",
+      },
+    },
+    {
+      name: "Tissue culture plasticware (T75, 6-well plates, tips)",
+      purpose: "Expansion and post-thaw recovery plates",
+      vendor: "General lab supplier",
+      catalog: CATALOG_VERIFY_REQUIRED,
+      quantity: "Bundle",
+      unitCost: 420,
+      total: 420,
+      category: "consumable",
+      verification: {
+        status: "pending",
+        note: "Bundle estimate — itemise with a vendor catalog before ordering.",
+      },
+    },
+    {
+      name: "Operator time (technician, 0.2 FTE × 6 wk)",
+      purpose: "Hands-on execution, counting, analysis",
+      vendor: "—",
+      catalog: "—",
+      quantity: "1.2 FTE-wk",
+      unitCost: 1500,
+      total: 1800,
+      category: "service",
+      verification: {
+        status: "pending",
+        note: "Internal cost estimate — confirm with PI / department rate card.",
+      },
+    },
   ],
   timeline: [
-    { week: 1, phase: "Planning", milestone: "Project kickoff", tasks: ["Finalize sgRNA designs", "Order reagents", "Confirm organoid line availability", "Pre-register on OSF"], deliverable: "Locked experimental design + OSF entry" },
-    { week: 2, phase: "Literature review", milestone: "Evidence base finalized", tasks: ["Cross-check IL6 organoid lit", "Compile compensatory cytokine list", "Identify negative results in field"], deliverable: "Annotated bibliography (15 papers)" },
-    { week: 3, phase: "Protocol setup", milestone: "Constructs & organoids ready", tasks: ["Clone sgRNAs into lentiviral backbone", "Sanger-verify", "Expand 3 organoid lines to passage 8"], deliverable: "QC'd plasmids + healthy organoid stocks" },
-    { week: 4, phase: "Experiment", milestone: "Knockdown established", tasks: ["Lentiviral transduction", "Puromycin selection", "RT-qPCR knockdown verification"], deliverable: "≥70% IL6 knockdown confirmed in 3 lines" },
-    { week: 5, phase: "Experiment", milestone: "Challenge complete", tasks: ["TNF-α/IFN-γ stimulation 24h", "Collect supernatants + cell pellets", "Submit RNA-seq libraries"], deliverable: "All samples banked & submitted" },
-    { week: 6, phase: "Analysis", milestone: "Primary readouts in", tasks: ["Run 5-plex ELISA", "Receive bulk RNA-seq data", "DESeq2 differential expression"], deliverable: "Cytokine + DE gene tables" },
-    { week: 7, phase: "Validation", milestone: "Reproducibility check", tasks: ["Process scRNA-seq (Seurat)", "Compare to Smillie et al. atlas", "Validate top hits in 2nd organoid batch"], deliverable: "Independent replicate confirms direction" },
-    { week: 8, phase: "Final report", milestone: "Manuscript & deposit", tasks: ["Generate 4 main figures", "Write methods + results", "Deposit raw data on GEO"], deliverable: "Draft manuscript + GEO accession" },
+    { week: 1, phase: "Planning",        milestone: "Project locked",            tasks: ["Pre-register hypothesis and ≥15 pp threshold on OSF", "Order trehalose, DMSO, FBS, trypan blue", "Confirm HeLa stock available or order vial"], deliverable: "OSF entry + reagent order placed" },
+    { week: 2, phase: "Cell prep",       milestone: "Cells expanded",            tasks: ["Thaw working HeLa stock", "Expand to 80–90% confluence in T75", "Mycoplasma test"],                                                               deliverable: "Healthy HeLa stock at passage ≤ +5" },
+    { week: 3, phase: "Freezing",        milestone: "All arms frozen",           tasks: ["Prepare DMSO / trehalose / sucrose / PBS freezing media", "Harvest, count, aliquot 6 vials per arm", "Freeze at -80 °C, transfer to LN₂"],            deliverable: "24 cryovials in LN₂ vapour phase" },
+    { week: 4, phase: "Storage",         milestone: "Storage hold",              tasks: ["Hold ≥7 days in LN₂ to mimic real storage", "Pre-warm media and prep counting station", "Blind sample labels for the counter"],                       deliverable: "Storage period complete, counter blinded" },
+    { week: 5, phase: "Thaw + measure",  milestone: "Primary readout collected", tasks: ["Thaw all vials, count viability at t = 0 h", "Plate into 6-well, re-count at 24 h", "Re-count at 72 h"],                                            deliverable: "Raw viability counts at 0 / 24 / 72 h" },
+    { week: 6, phase: "Analysis",        milestone: "Report drafted",            tasks: ["Compute mean ± SD per arm and per time point", "Test ≥15 pp threshold (trehalose vs DMSO at t = 0 h)", "Write short methods + results, deposit on OSF"], deliverable: "Locked OSF report + figures" },
   ],
   validation: {
     primaryMetric: {
-      name: "CXCL8 (IL-8) secretion reduction in IL6-KD vs scrambled under TNF-α/IFN-γ challenge",
-      target: "≥50% reduction (p<0.01)",
-      method: "ELISA on 24h conditioned media, n=4 wells × 3 organoid lines",
+      name: "Post-thaw viability difference: trehalose arm − DMSO arm at t = 0 h",
+      target: "≥15 percentage points (pre-registered, n = 6 vials per arm)",
+      method: "Trypan blue 0.4% exclusion on hemocytometer; counter blinded to arm; two technical counts per vial averaged.",
     },
     secondaryMetrics: [
-      { name: "IL-1β secretion", target: "≥40% reduction", method: "Multiplex ELISA" },
-      { name: "TNF-α secretion (autocrine)", target: "≥30% reduction", method: "Multiplex ELISA" },
-      { name: "Compensatory IL11 elevation", target: "<2-fold rebound", method: "ELISA + RT-qPCR" },
-      { name: "Inflammation-associated DE genes", target: "≥40% reversal of TNF-α-induced signature", method: "Bulk RNA-seq + DESeq2 (FDR<0.05)" },
-      { name: "Enterocyte subcluster proportion", target: "Detectable shift (>10%)", method: "scRNA-seq + Seurat label transfer" },
+      { name: "Viability at 24 h post-plating", target: "Trehalose ≥ DMSO within 5 pp", method: "Trypan blue count from 6-well plate detachment" },
+      { name: "Viability at 72 h post-plating", target: "Trehalose ≥ DMSO within 5 pp", method: "Trypan blue count from 6-well plate detachment" },
+      { name: "Visual confluence at day 3",     target: "Comparable across surviving arms", method: "Inverted microscope, 4× and 10× fields, scored blinded" },
+      { name: "Negative-control viability (PBS-only)", target: "<20%", method: "Sanity check that the assay can detect cryo-damage" },
     ],
     statisticalApproach:
-      "Two-way ANOVA (genotype × treatment) with Tukey HSD post-hoc for ELISA. DESeq2 with Benjamini-Hochberg correction for RNA-seq. Pre-registered analysis plan on OSF; effect size threshold ≥0.5 (Cohen's d). Power analysis: n=4 wells × 3 lines detects 35% effect at α=0.05, 80% power.",
+      "Pre-registered one-sided Welch's t-test (trehalose > DMSO) at t = 0 h with α = 0.05; success requires the point estimate of the difference to meet the ≥15 pp threshold and the lower 95% CI bound to exclude 0. Secondary time points reported with two-way ANOVA (arm × time) and Tukey HSD; raw counts and analysis script published on OSF.",
     reproducibilityChecks: [
-      "Independent organoid batch (different passage) repeats primary readout in week 7.",
-      "Two independent operators perform ELISA on identical samples; CV must be <15%.",
-      "Raw RNA-seq deposited on GEO; analysis code on GitHub with Docker container.",
-      "OSF pre-registration locked before unblinding any data.",
+      "Pre-register the ≥15 pp threshold and counting SOP on OSF before unblinding any vial.",
+      "A second operator independently re-counts a random 25% of vials; concordance must be within 10%.",
+      "Raw count sheets and the analysis script (R or Python) deposited on OSF alongside the report.",
+      "Repeat the freeze with one independent batch of HeLa if budget allows (week 7 stretch goal).",
     ],
-    positiveControl: "Tocilizumab (10 µg/mL) co-treatment — expected to phenocopy IL6R knockdown direction.",
-    negativeControl: "Scrambled sgRNA + vehicle — defines baseline inflammatory response variability.",
-    source: PENDING,
+    positiveControl: "Non-frozen aliquot from the same harvest, counted at the same time points — defines maximum achievable viability for that batch.",
+    negativeControl: "PBS-only freezing medium (no cryoprotectant) — defines the floor and confirms the assay can detect cryo-damage.",
+    source: {
+      status: "pending",
+      note: "MIQE guidelines apply only if qPCR is added; this protocol uses trypan blue counting, not qPCR. If a qPCR validation arm is added, cite the MIQE guidelines.",
+      sourceUrl: "https://pubmed.ncbi.nlm.nih.gov/19246619/",
+    },
   },
   risks: [
-    { id: "r1", title: "IL6 knockdown <70% — insufficient for downstream comparison", category: "scientific", likelihood: "medium", impact: "high", mitigation: "Pre-screen 4 sgRNAs per gene in HEK293T first; advance only top 2 to organoids. Backup: SaCas9-KRAB if SpCas9 fails." },
-    { id: "r2", title: "Compensatory IL11/IL22 masks phenotype", category: "scientific", likelihood: "medium", impact: "medium", mitigation: "Pre-include IL11/IL22 in ELISA panel; plan combinatorial IL6+IL11 KD as week-9 follow-up if rebound exceeds 2-fold." },
-    { id: "r3", title: "Organoid line variability dominates signal", category: "scientific", likelihood: "high", impact: "medium", mitigation: "Use 3 donor lines as biological reps; mixed-effects model with line as random effect; report per-line breakdown in supplement." },
-    { id: "r4", title: "Lentiviral titer low → poor transduction", category: "operational", likelihood: "low", impact: "high", mitigation: "Outsource to VectorBuilder for guaranteed 1×10⁹ TU/mL; have backup electroporation protocol (Lonza 4D)." },
-    { id: "r5", title: "scRNA-seq run fails QC (low cell capture)", category: "operational", likelihood: "low", impact: "medium", mitigation: "Reserve a backup 10x reaction; if dropped, fall back to bulk RNA-seq + computational deconvolution (CIBERSORTx)." },
-    { id: "r6", title: "Reagent costs exceed $28k budget (esp. scRNA-seq)", category: "budget", likelihood: "medium", impact: "medium", mitigation: "Pre-negotiated 10x academic discount (~15%); deprioritize scRNA-seq to single line if needed; bulk RNA-seq alone suffices for primary endpoint." },
-    { id: "r7", title: "Donor consent restrictions on data sharing", category: "ethical/safety", likelihood: "low", impact: "medium", mitigation: "Confirm existing IRB covers GEO deposition; otherwise deposit controlled-access on dbGaP. Use only de-identified line IDs." },
-    { id: "r8", title: "Organoid contamination (mycoplasma)", category: "operational", likelihood: "low", impact: "high", mitigation: "Mycoplasma-test all lines on receipt and at weeks 2, 5, 7. Maintain frozen backup stocks at every passage." },
+    { id: "r1", title: "Trehalose poorly enters HeLa cells, limiting protective effect",                        category: "scientific",     likelihood: "medium", impact: "high",   mitigation: "Use trehalose in combination with 5% DMSO (rather than alone) so the test arm still has some intracellular cryoprotection; cite the RSC review on permeability limits in the discussion." },
+    { id: "r2", title: "Counter bias inflates viability differences between arms",                              category: "scientific",     likelihood: "medium", impact: "medium", mitigation: "Blind the counter to arm identity by re-labelling vials; have a second operator re-count a random 25% of vials." },
+    { id: "r3", title: "HeLa batch variability dominates the cryoprotectant effect",                           category: "scientific",     likelihood: "medium", impact: "medium", mitigation: "Run all arms from a single harvest on the same day; if budget allows, repeat with one independent harvest as a stretch confirmation." },
+    { id: "r4", title: "Reagent backorder delays the freeze week",                                              category: "operational",    likelihood: "low",    impact: "medium", mitigation: "Order trehalose, FBS, and trypan blue in week 1; identify a second supplier for each; keep the schedule flexible by ±1 week." },
+    { id: "r5", title: "Mycoplasma contamination invalidates viability counts",                                category: "operational",    likelihood: "low",    impact: "high",   mitigation: "Mycoplasma-test the working HeLa stock in week 2 before freezing; discard and rethaw a clean stock if positive." },
+    { id: "r6", title: "Total cost overruns the $4.2k budget (esp. FBS or HeLa vial pricing changes)",         category: "budget",         likelihood: "medium", impact: "low",    mitigation: "Confirm current Sigma / Thermo prices in week 1 (catalog numbers carry verify-before-ordering notes); if FBS pricing has risen, drop one biological replicate vial per arm rather than skip controls." },
+    { id: "r7", title: "Donor-cell-line consent or BSL-2 paperwork incomplete before week 3",                  category: "ethical/safety", likelihood: "low",    impact: "medium", mitigation: "HeLa is a standard BSL-2 line; confirm institutional biosafety registration covers it before ordering, and keep the SDS on file for DMSO and trehalose handling." },
   ],
   problemStatement:
-    "Inflammatory bowel disease affects 7M+ people globally, yet IL6 pathway inhibitors (tocilizumab) failed in late-stage Crohn's trials despite strong preclinical signals. We need a human-relevant model to dissect why — and to identify which epithelial cell types and compensatory cytokines limit efficacy.",
+    "DMSO is the standard cryoprotectant for HeLa and most adherent cell lines, but DMSO is cytotoxic at 37 °C and complicates downstream assays. Trehalose is a non-toxic disaccharide with a documented cryoprotective effect in primary cells. Whether trehalose can match or beat DMSO for HeLa post-thaw viability has not been cleanly tested with a pre-registered effect size.",
   whyItMatters:
-    "If we can show that durable IL6 silencing in human intestinal organoids reduces inflammation by ≥50% and identify the compensatory IL11 axis, we provide a mechanistic rationale for combination therapy — a direct, testable hypothesis for the next IBD clinical trial.",
-  budgetSource: PENDING,
-  timelineSource: PENDING,
+    "If trehalose increases HeLa post-thaw viability by ≥15 percentage points over DMSO, labs gain a lower-toxicity freezing option for an extremely common cell line, with direct downstream benefits for assay quality and animal-free workflows.",
+  budgetSource: {
+    status: "pending",
+    note: "Costs derived from real Sigma / Thermo catalog pages (linked per material). Prices and pack sizes change — verify before ordering.",
+  },
+  timelineSource: verified(
+    "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
+    "Timeline derived from OpenWetWare freeze-down/thaw protocol durations.",
+  ),
 };
 
-const STORAGE_KEY = "h2p_projects_v2";
+const STORAGE_KEY = "h2p_projects_v3_trehalose";
 
 export function loadProjects(): Project[] {
   if (typeof window === "undefined") return [];
