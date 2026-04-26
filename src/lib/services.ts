@@ -47,23 +47,20 @@ function delay<T>(value: T, ms = SIMULATED_LATENCY_MS): Promise<T> {
 }
 
 // ------------------------------------------------------------
-// 1. Literature search — Semantic Scholar /paper/search
+// 1. Literature search — server proxy → Semantic Scholar
 // ------------------------------------------------------------
 /**
  * Search literature for a hypothesis / query string.
  *
- * Tries the public Semantic Scholar API first (no key required).
- * If a VITE_SEMANTIC_SCHOLAR_API_KEY env var is set, it is sent
- * as the `x-api-key` header (higher rate limit). On any failure
- * (CORS, rate limit, network, empty result), falls back to the
- * verified seeded corpus in mockData.ts so the demo never breaks.
+ * Calls our own server route POST /api/search-papers, which
+ * proxies to Semantic Scholar with the server-only
+ * SEMANTIC_SCHOLAR_API_KEY (never exposed to the browser).
  *
- *   GET https://api.semanticscholar.org/graph/v1/paper/search
- *     ?query=<encoded query>&limit=10
- *     &fields=title,authors,year,venue,abstract,citationCount,url
+ * On ANY failure (HTTP error, 429/403, network, empty result),
+ * falls back to the verified seeded corpus in mockData.ts so the
+ * demo never breaks.
  */
-const S2_ENDPOINT = "https://api.semanticscholar.org/graph/v1/paper/search";
-const S2_FIELDS = "title,authors,year,venue,abstract,citationCount,url,externalIds";
+const PROXY_ENDPOINT = "/api/search-papers";
 
 type S2Author = { name?: string };
 type S2Paper = {
