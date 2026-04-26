@@ -351,20 +351,70 @@ function ProjectPage() {
               </Card>
             )}
             {(() => {
-              const displayPapers = livePapers ?? plan.papers;
+              // Provenance priority: livePlan.source_status.literature wins over
+              // the legacy paperSource state (which only updates when the user
+              // clicks "Refresh from Semantic Scholar"). This guarantees the
+              // Related work badge stays consistent with the Real-data pipeline
+              // panel after a /api/generate-plan run.
+              const liveLit = livePlan?.source_status?.literature ?? null;
+              const liveEvidence = livePlan?.evidence_map ?? null;
+
+              const displayPapers: Paper[] =
+                liveEvidence && liveEvidence.length > 0
+                  ? liveEvidence.map((e) => ({
+                      id: e.id,
+                      title: e.title,
+                      authors: "",
+                      year: e.year,
+                      venue: e.venue,
+                      citations: 0,
+                      similarity: e.relevance_score,
+                      abstract: "",
+                      whyItMatters:
+                        e.role === "primary"
+                          ? "Primary evidence for this hypothesis."
+                          : e.role === "supporting"
+                            ? "Supporting evidence."
+                            : "Background reference.",
+                      doi: e.source_url,
+                      verification: {
+                        status: "verified",
+                        sourceUrl: e.source_url,
+                        note:
+                          e.source === "semantic-scholar"
+                            ? "Semantic Scholar"
+                            : e.source === "pubmed"
+                              ? "PubMed"
+                              : "Curated fallback",
+                        checkedAt: new Date().toISOString().slice(0, 10),
+                      },
+                    }))
+                  : (livePapers ?? plan.papers);
+
               const isRateLimited = /rate limit/i.test(paperSourceNote);
-              const sourceLabel =
-                paperSource === "live-api"
+              const sourceLabel = liveLit
+                ? liveLit.ok
+                  ? "LIVE SEMANTIC SCHOLAR"
+                  : "Curated fallback"
+                : paperSource === "live-api"
                   ? "Live Semantic Scholar"
                   : paperSource === "fallback"
                     ? isRateLimited
                       ? "Rate limited — using verified seeded fallback"
                       : "Verified seeded fallback"
                     : "Verified seeded data";
-              const sourceClass =
-                paperSource === "live-api"
+              const sourceClass = liveLit
+                ? liveLit.ok
+                  ? "border-success/40 bg-success/10 text-success"
+                  : "border-warning/40 bg-warning/10 text-warning-foreground"
+                : paperSource === "live-api"
                   ? "border-success/40 bg-success/10 text-success"
                   : "border-warning/40 bg-warning/10 text-warning-foreground";
+              const sourceNote = liveLit
+                ? liveLit.ok
+                  ? `Returned ${displayPapers.length} papers via Semantic Scholar.`
+                  : liveLit.reason
+                : paperSourceNote;
               return (
                 <>
                   <SectionHeader
@@ -376,8 +426,8 @@ function ProjectPage() {
                       <Badge variant="outline" className={`text-[10px] uppercase tracking-wider ${sourceClass}`}>
                         {literatureLoading ? "Querying Semantic Scholar…" : sourceLabel}
                       </Badge>
-                      {paperSourceNote && (
-                        <span className="text-xs text-muted-foreground">{paperSourceNote}</span>
+                      {sourceNote && (
+                        <span className="text-xs text-muted-foreground">{sourceNote}</span>
                       )}
                     </div>
                     <Button
@@ -390,7 +440,7 @@ function ProjectPage() {
                       {literatureLoading ? "Refreshing…" : "Refresh from Semantic Scholar"}
                     </Button>
                   </div>
-                  {literatureDebug && (
+                  {literatureDebug && !liveLit && (
                     <div className="rounded-md border border-dashed border-border/60 bg-muted/30 px-3 py-2 font-mono text-[11px] text-muted-foreground">
                       <span className="mr-3">Proxy: {literatureDebug.proxyUsed ? "active" : "off"}</span>
                       <span className="mr-3">API key detected: {literatureDebug.hasApiKey ? "yes" : "no"}</span>

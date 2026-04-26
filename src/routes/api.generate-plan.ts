@@ -190,21 +190,39 @@ export const Route = createFileRoute("/api/generate-plan")({
         };
 
         // ----- Lab readiness score -----
-        const readinessFactors = {
-          verified_materials_ratio:
-            materials.length === 0
-              ? 0
-              : materials.filter((m) => m.verified).length / materials.length,
-          has_primary_protocol: protocols.length > 0 ? 1 : 0,
-          within_budget: materials_budget.within_budget ? 1 : 0,
-          has_evidence: papers.length >= 2 ? 1 : papers.length === 1 ? 0.5 : 0,
-        };
+        // Weights: literature 25 / protocols 25 / materials 30 / budget 20.
+        // Penalties: protocols fallback, missing catalog, missing/generic source URL.
+        const litLive = !usedFallback.literature;
+        const literatureScore = litLive && papers.length >= 3 ? 25 : papers.length >= 2 ? 18 : papers.length >= 1 ? 10 : 0;
+
+        const protocolsLive = protocols.length > 0 && !usedFallback.protocols;
+        const protocolsScore = protocolsLive ? 25 : protocols.length > 0 ? 12 : 0; // partial when curated fallback
+
+        let materialsScore = 0;
+        if (materials.length > 0) {
+          const perItem = 30 / materials.length;
+          for (const m of materials) {
+            let item = perItem;
+            if (!m.verified) {
+              item = 0; // unmatched / unverified item
+            } else {
+              if (!m.catalog || m.catalog === "VERIFY_REQUIRED") item -= perItem * 0.5;
+              const url = m.source_url ?? "";
+              const hasSpecificUrl =
+                /sigmaaldrich\.com|thermofisher\.com|fishersci\.com|gibco|milliporesigma|neb\.com|bio-rad|abcam/i.test(url);
+              if (!url) item -= perItem * 0.4;
+              else if (!hasSpecificUrl) item -= perItem * 0.2; // generic vendor
+            }
+            materialsScore += Math.max(0, item);
+          }
+        }
+
+        const budgetScore = materials_budget.within_budget ? 20 : 0;
+
         const lab_readiness_score = Math.round(
-          readinessFactors.verified_materials_ratio * 35 +
-            readinessFactors.has_primary_protocol * 25 +
-            readinessFactors.within_budget * 20 +
-            readinessFactors.has_evidence * 20,
+          literatureScore + protocolsScore + materialsScore + budgetScore,
         );
+
 
         // ----- Literature QC -----
         const literature_qc = {
@@ -284,29 +302,42 @@ export const Route = createFileRoute("/api/generate-plan")({
         };
 
         // ----- Per-source status (for the UI panel) -----
+        const lastProtoAttempt = protoDebug.attempts[protoDebug.attempts.length - 1];
+        const protoStatusCode = lastProtoAttempt?.status_code ?? protoDebug.protocolsIoStatus ?? 0;
+        const protoErrorMsg = protoDebug.errors[0] ?? lastProtoAttempt?.error_message ?? null;
+
         const source_status = {
           literature: {
             label: usedFallback.literature ? "Curated fallback" : "Live Semantic Scholar",
             ok: !usedFallback.literature,
+            coverage: usedFallback.literature ? "fallback" : "full",
             reason: usedFallback.literature
               ? `Fewer than 3 relevant papers after ${litDebug.attempts.length} query variant${litDebug.attempts.length === 1 ? "" : "s"}.`
-              : `${papers.length} papers via ${litDebug.source}.`,
+              : `Returned ${papers.length} papers via Semantic Scholar.`,
           },
           protocols: {
             label: usedFallback.protocols ? "Curated fallback" : "Live protocols.io",
             ok: !usedFallback.protocols,
+            coverage: usedFallback.protocols ? "partial" : "full",
             reason: usedFallback.protocols
-              ? protoDebug.errors[0]
-                ? `protocols.io error: ${protoDebug.errors[0]}`
-                : "protocols.io returned zero usable protocols."
+              ? `protocols.io HTTP ${protoStatusCode || "—"}${protoErrorMsg ? ` · ${protoErrorMsg}` : ""}`
               : `${protocols.length} protocols from protocols.io.`,
           },
           materials: {
-            label: "Verified supplier registry",
-            ok: matDebug.matchedCount > 0,
+            label: matDebug.unmatchedCount > 0
+              ? "Verified registry (partial)"
+              : "Verified supplier registry",
+            ok: matDebug.matchedCount > 0 && matDebug.unmatchedCount === 0,
+            coverage:
+              matDebug.matchedCount === 0
+                ? "fallback"
+                : matDebug.unmatchedCount > 0
+                  ? "partial"
+                  : "full",
             reason: `${matDebug.matchedCount} matched / ${matDebug.unmatchedCount} unverified (registry size ${matDebug.registrySize}).`,
           },
         };
+
 
         const debug = {
           orchestrator: { evidenceWeak, usedFallback },
