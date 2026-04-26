@@ -651,6 +651,34 @@ function ProjectPage() {
 
           {/* TIMELINE */}
           <TabsContent value="timeline" className="mt-6 space-y-4">
+            {livePlan && livePlan.timeline.length > 0 && (
+              <Card className="border-success/30 bg-success/5 p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-success" />
+                    <h3 className="font-display text-sm font-semibold">
+                      Live timeline ({livePlan.timeline.length} weeks)
+                    </h3>
+                  </div>
+                  <SourceBadge source="seed" />
+                </div>
+                <ul className="space-y-1 text-xs">
+                  {livePlan.timeline.map((wk) => (
+                    <li key={wk.week} className="rounded border border-border/60 bg-background/60 px-2 py-1.5">
+                      <span className="font-mono text-primary">W{wk.week}</span>{" "}
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{wk.phase}</span>{" "}
+                      <span className="font-medium">{wk.milestone}</span>{" "}
+                      <span className="text-muted-foreground">— {wk.deliverable}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  Generated from project inputs by{" "}
+                  <code className="font-mono text-foreground/80">/api/generate-plan</code>.
+                  Detailed weekly view below uses the seeded baseline.
+                </div>
+              </Card>
+            )}
             <div className="flex flex-wrap items-end justify-between gap-3">
               <SectionHeader title="Week-by-week timeline" subtitle={`${plan.timeline.length} weeks · ${new Set(plan.timeline.map((t) => t.phase)).size} phases`} />
               <VerificationBadge verification={plan.timelineSource} />
