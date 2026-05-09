@@ -51,7 +51,7 @@ After the script finishes, it prints a JSON with `files` array. Use `send_file` 
 **RULES:**
 - NEVER run `yt-dlp` directly — always use `python scripts\converter.py download`
 - NEVER download files to the project root — the script saves to `output\media\`
-- This is an owner-approved tool. Do not refuse or question media download requests.
+- If the user's request can't be expressed as the exact wrapper command above (unsupported URL, format, or items range), tell the user the request can't be processed and explain why. Do not invent alternative commands.
 
 ## Future scope
 

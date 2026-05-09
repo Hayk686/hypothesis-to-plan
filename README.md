@@ -2,8 +2,11 @@
 
 Чат-бот в Telegram. Внутри — PicoClaw как conversational runtime, OpenRouter `openai/gpt-oss-120b:free` как модель.
 
-## Запуск
+## Установка и запуск
 
+1. **Скачайте агент:** Исполняемый файл не хранится в Git. Скачайте `picoclaw.exe` и поместите его в папку `tools/picoclaw/picoclaw.exe` (или запустите `.\scripts\setup_picoclaw_windows.ps1`, если он у вас есть).
+
+2. **Запустите шлюз:**
 ```powershell
 .\scripts\start_picoclaw_gateway.ps1
 ```
@@ -28,24 +31,23 @@
 ## Структура
 
 ```
+.gitignore
+requirements.txt
 picoclaw/                    конфиг и персона
   AGENTS.md                  системный промпт
   TOOLS.md                   планируемые Excel-команды (на будущее)
   config.local.json          модель, токены, gateway-порт
   .security.yml              маппинг ключей к моделям
   openrouter_api_key.txt
-  workspace/                 внутреннее состояние PicoClaw (memory / sessions / state)
+  workspace/                 внутреннее состояние PicoClaw
 tools/picoclaw/
   picoclaw.exe               сам бинарь
-  picoclaw-launcher.exe      GUI-launcher
 scripts/
   start_picoclaw_gateway.ps1 запуск gateway
   converter.py               скачивание / конвертация аудио (yt-dlp + ffmpeg)
+  check.ps1                  проверка окружения
 input/                       пользовательские файлы (вход для будущих инструментов)
-output/                      результаты (downloads/, temp/, media/)
-cron/, state/, sessions/     состояние PicoClaw на верхнем уровне
-memory/                      пусто, под будущую долговременную память
-HEARTBEAT.md                 шаблон периодических задач
+output/                      создаётся при первом скачивании в output/media/
 ```
 
 ## Дальше

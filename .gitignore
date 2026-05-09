@@ -14,10 +14,14 @@ picoclaw/config.local.json
 output/
 sessions/
 state/
-memory/
 picoclaw/workspace/
 cron/
 .claude/
+
+# Logs and background tasks
+HEARTBEAT.md
+heartbeat.log
+*.log
 
 # Downloaded binaries
 tools/picoclaw/

@@ -9,6 +9,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -27,6 +28,13 @@ DEFAULT_OUTPUT_DIR = os.path.join("output", "media")
 # ─── YouTube download ────────────────────────────────────────────────
 
 def download(url: str, items: str = "1:10", fmt: str = "mp3", output_dir: str = DEFAULT_OUTPUT_DIR) -> dict:
+    if not re.fullmatch(r"https?://\S+", url):
+        return {"status": "error", "error": "url must be http(s)://"}
+    if not re.fullmatch(r"\d+:\d+", items):
+        return {"status": "error", "error": "items must be N:N"}
+    if fmt not in {"mp3", "m4a", "wav", "flac", "opus"}:
+        return {"status": "error", "error": f"unsupported format: {fmt}"}
+    output_dir = DEFAULT_OUTPUT_DIR  # ignore caller's value, always output/media
     os.makedirs(output_dir, exist_ok=True)
 
     cmd = [
