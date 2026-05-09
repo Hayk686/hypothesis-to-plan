@@ -1,0 +1,71 @@
+{
+  "version": 3,
+  "agents": {
+    "defaults": {
+      "workspace": "..",
+      "restrict_to_workspace": true,
+      "allow_read_outside_workspace": false,
+      "provider": "openai",
+      "model_name": "openrouter-free",
+      "max_tokens": 32768,
+      "max_tool_iterations": 30,
+      "split_on_marker": true,
+      "steering_mode": "",
+      "summarize_message_threshold": 120000,
+      "summarize_token_percent": 50
+    }
+  },
+  "model_list": [
+    {
+      "model_name": "openrouter-free",
+      "provider": "openai",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "api_base": "https://openrouter.ai/api/v1"
+    }
+  ],
+  "tools": {
+    "filter_sensitive_data": true,
+    "exec": {
+      "enable_deny_patterns": true,
+      "custom_allow_patterns": [
+        "^python scripts\\\\picoclaw_tool\\.py analyze --input [-A-Za-z0-9_ .:\\\\\\/]+ --output-dir [-A-Za-z0-9_ .:\\\\\\/]+( --sheet .+)?$",
+        "^python scripts\\\\picoclaw_tool\\.py compare --left [-A-Za-z0-9_ .:\\\\\\/]+ --right [-A-Za-z0-9_ .:\\\\\\/]+ --output-dir [-A-Za-z0-9_ .:\\\\\\/]+$",
+        "^python scripts\\\\picoclaw_tool\\.py duplicates --input [-A-Za-z0-9_ .:\\\\\\/]+ --output-dir [-A-Za-z0-9_ .:\\\\\\/]+( --sheet .+)?$",
+        "^python scripts\\\\picoclaw_tool\\.py reorder --input [-A-Za-z0-9_ .:\\\\\\/]+ --output-dir [-A-Za-z0-9_ .:\\\\\\/]+$"
+      ]
+    }
+  },
+  "channel_list": {
+    "telegram": {
+      "enabled": false,
+      "type": "telegram",
+      "reasoning_channel_id": "",
+      "group_trigger": {},
+      "typing": {
+        "enabled": false
+      },
+      "placeholder": {
+        "enabled": false,
+        "text": [
+          "Working on it..."
+        ]
+      },
+      "settings": {
+        "token": "YOUR_TELEGRAM_BOT_TOKEN",
+        "base_url": "",
+        "proxy": "",
+        "streaming": {
+          "enabled": false,
+          "throttle_seconds": 3,
+          "min_growth_chars": 200
+        },
+        "use_markdown_v2": false
+      }
+    }
+  },
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 18790,
+    "log_level": "warn"
+  }
+}

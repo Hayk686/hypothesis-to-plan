@@ -1,0 +1,4 @@
+model_list:
+  openrouter-free:0:
+    api_keys:
+      - file://openrouter_api_key.txt

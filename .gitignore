@@ -1,0 +1,23 @@
+# IDEs and Environments
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+
+# Local config and secrets
+*.local.json
+*_api_key.txt
+.env
+picoclaw/config.local.json
+
+# Dynamic directories / state
+output/
+sessions/
+state/
+memory/
+picoclaw/workspace/
+cron/
+.claude/
+
+# Downloaded binaries
+tools/picoclaw/
