@@ -6,48 +6,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2, MessageSquare, Sparkles, Star } from "lucide-react";
 import { toast } from "sonner";
+import {
+  loadScientistFeedback,
+  persistScientistFeedback,
+  type ScientistFeedbackRecord,
+  type ScientistFeedbackSection,
+} from "@/lib/scientistFeedback";
 
-type Section = "Protocol" | "Supplies" | "Budget" | "Timeline" | "Validation";
-
-const SECTIONS: Section[] = [
+const SECTIONS: ScientistFeedbackSection[] = [
   "Protocol",
   "Supplies",
   "Budget",
   "Timeline",
   "Validation",
 ];
-
-export type ScientistFeedbackRecord = {
-  id: string;
-  experimentType: string;
-  section: Section;
-  rating: number;
-  originalSuggestion: string;
-  correctedValue: string;
-  reason: string;
-  createdAt: string;
-};
-
-const STORAGE_KEY = "h2p_scientist_feedback_v2";
-
-function loadFeedback(): ScientistFeedbackRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as ScientistFeedbackRecord[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistFeedback(list: ScientistFeedbackRecord[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  } catch {
-    /* best-effort */
-  }
-}
 
 export function ScientistFeedbackPanel({
   experimentType,
@@ -56,13 +28,13 @@ export function ScientistFeedbackPanel({
   experimentType: string;
   compact?: boolean;
 }) {
-  const [section, setSection] = useState<Section>("Protocol");
+  const [section, setSection] = useState<ScientistFeedbackSection>("Protocol");
   const [rating, setRating] = useState<number>(4);
   const [original, setOriginal] = useState<string>("");
   const [corrected, setCorrected] = useState<string>("");
   const [reason, setReason] = useState<string>("");
   const [history, setHistory] = useState<ScientistFeedbackRecord[]>(() =>
-    loadFeedback().filter((r) => r.experimentType === experimentType),
+    loadScientistFeedback().filter((r) => r.experimentType === experimentType),
   );
   const [lastSaved, setLastSaved] = useState<ScientistFeedbackRecord | null>(null);
 
@@ -81,9 +53,9 @@ export function ScientistFeedbackPanel({
       reason: reason.trim() || "(no reason provided)",
       createdAt: new Date().toISOString(),
     };
-    const all = loadFeedback();
+    const all = loadScientistFeedback();
     all.push(record);
-    persistFeedback(all);
+    persistScientistFeedback(all);
     setHistory((h) => [record, ...h]);
     setLastSaved(record);
     toast.success("Feedback saved as structured correction");
@@ -105,15 +77,13 @@ export function ScientistFeedbackPanel({
         </Badge>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Rate each section, paste the original suggestion, the corrected value, and the
-        reason. Saved feedback becomes context for the next similar plan.
+        Rate each section, paste the original suggestion, the corrected value, and the reason. Saved
+        feedback becomes context for the next similar plan.
       </p>
 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            Section
-          </Label>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Section</Label>
           <div className="flex flex-wrap gap-1.5">
             {SECTIONS.map((s) => (
               <button
@@ -147,23 +117,22 @@ export function ScientistFeedbackPanel({
               >
                 <Star
                   className={`h-5 w-5 ${
-                    n <= rating
-                      ? "fill-primary text-primary"
-                      : "text-muted-foreground/40"
+                    n <= rating ? "fill-primary text-primary" : "text-muted-foreground/40"
                   }`}
                 />
               </button>
             ))}
-            <span className="ml-2 font-mono text-xs text-muted-foreground">
-              {rating}/5
-            </span>
+            <span className="ml-2 font-mono text-xs text-muted-foreground">{rating}/5</span>
           </div>
         </div>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="fb-original" className="text-xs uppercase tracking-wider text-muted-foreground">
+          <Label
+            htmlFor="fb-original"
+            className="text-xs uppercase tracking-wider text-muted-foreground"
+          >
             Original suggestion
           </Label>
           <Textarea
@@ -176,7 +145,10 @@ export function ScientistFeedbackPanel({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="fb-corrected" className="text-xs uppercase tracking-wider text-muted-foreground">
+          <Label
+            htmlFor="fb-corrected"
+            className="text-xs uppercase tracking-wider text-muted-foreground"
+          >
             Corrected value
           </Label>
           <Textarea
@@ -191,7 +163,10 @@ export function ScientistFeedbackPanel({
       </div>
 
       <div className="mt-3 space-y-2">
-        <Label htmlFor="fb-reason" className="text-xs uppercase tracking-wider text-muted-foreground">
+        <Label
+          htmlFor="fb-reason"
+          className="text-xs uppercase tracking-wider text-muted-foreground"
+        >
           Reason / scientific rationale
         </Label>
         <Textarea
@@ -227,7 +202,10 @@ export function ScientistFeedbackPanel({
               <FeedbackRow label="Original suggestion" value={lastSaved.originalSuggestion} />
               <FeedbackRow label="Corrected value" value={lastSaved.correctedValue} />
               <FeedbackRow label="Reason" value={lastSaved.reason} />
-              <FeedbackRow label="Status" value="Will be used as context for the next similar plan" />
+              <FeedbackRow
+                label="Status"
+                value="Will be used as context for the next similar plan"
+              />
             </dl>
           </Card>
 
@@ -238,9 +216,7 @@ export function ScientistFeedbackPanel({
                 Next similar plan improvement
               </div>
             </div>
-            <p className="text-xs text-foreground/85">
-              {nextPlanImprovement(lastSaved)}
-            </p>
+            <p className="text-xs text-foreground/85">{nextPlanImprovement(lastSaved)}</p>
           </Card>
         </>
       )}
@@ -254,7 +230,9 @@ export function ScientistFeedbackPanel({
             {history.map((r) => (
               <li key={r.id} className="rounded border border-border/60 bg-card/60 p-2">
                 <div className="flex flex-wrap items-center justify-between gap-1">
-                  <Badge variant="outline" className="text-[10px]">{r.section}</Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    {r.section}
+                  </Badge>
                   <span className="font-mono text-[10px] text-muted-foreground">
                     {r.rating}/5 · {new Date(r.createdAt).toLocaleString()}
                   </span>
@@ -275,9 +253,7 @@ export function ScientistFeedbackPanel({
 function FeedbackRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[140px_1fr] gap-2">
-      <dt className="font-mono uppercase tracking-wider text-muted-foreground">
-        {label}
-      </dt>
+      <dt className="font-mono uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="text-foreground/90">{value}</dd>
     </div>
   );

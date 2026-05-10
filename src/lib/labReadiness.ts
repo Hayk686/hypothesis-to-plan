@@ -15,29 +15,22 @@
 //   - number of unresolved "verify before ordering" items
 // ============================================================
 
-import {
-  CATALOG_VERIFY_REQUIRED,
-  type GeneratedPlan,
-  type LiteratureQc,
-} from "@/lib/mockData";
+import { CATALOG_VERIFY_REQUIRED, type GeneratedPlan, type LiteratureQc } from "@/lib/mockData";
 
-export type LabReadinessStatus =
-  | "Draft"
-  | "Review Needed"
-  | "Lab-Ready Candidate";
+export type LabReadinessStatus = "Draft" | "Review Needed" | "Lab-Ready Candidate";
 
 export type LabReadinessFactor = {
   key: string;
   label: string;
   weight: number; // 0-100
-  score: number;  // 0-100
+  score: number; // 0-100
   detail: string;
 };
 
 export type LabReadinessReport = {
-  score: number;            // 0-100, weighted average
+  score: number; // 0-100, weighted average
   status: LabReadinessStatus;
-  topReasons: string[];     // 3 reasons (high or low)
+  topReasons: string[]; // 3 reasons (high or low)
   missingChecklist: string[];
   factors: LabReadinessFactor[];
   unresolvedVerifyCount: number;
@@ -48,9 +41,9 @@ function clamp(n: number, lo = 0, hi = 100) {
 }
 
 export type ProtocolLiveStatus = {
-  ok: boolean;                // true = live protocols.io worked
-  used_fallback: boolean;     // true = curated fallback used
-  reason?: string;            // e.g. "protocols.io HTTP 400"
+  ok: boolean; // true = live protocols.io worked
+  used_fallback: boolean; // true = curated fallback used
+  reason?: string; // e.g. "protocols.io HTTP 400"
 };
 
 export function computeLabReadiness(
@@ -100,9 +93,7 @@ export function computeLabReadiness(
   ).length;
   const matScore = clamp(((matTotal - matMissingCatalog) / matTotal) * 100);
   if (matMissingCatalog > 0) {
-    missing.push(
-      `${matMissingCatalog} material line item(s) missing a confirmed catalog number`,
-    );
+    missing.push(`${matMissingCatalog} material line item(s) missing a confirmed catalog number`);
   }
 
   // 4. Budget completeness — vendor coverage + budget source attached
@@ -125,16 +116,14 @@ export function computeLabReadiness(
   const tlSourceBonus = plan.timelineSource ? 15 : 0;
   const tlScore = clamp((tlComplete / tlTotal) * 85 + tlSourceBonus);
   if (tlComplete < tlTotal) {
-    missing.push(
-      `${tlTotal - tlComplete} week(s) missing a deliverable or task list`,
-    );
+    missing.push(`${tlTotal - tlComplete} week(s) missing a deliverable or task list`);
   }
   if (!plan.timelineSource) missing.push("Timeline source / SOP reference not attached");
 
   // 6. Validation plan completeness
   const v = plan.validation;
   let valFilled = 0;
-  let valTotal = 7;
+  const valTotal = 7;
   if (v.primaryMetric?.name && v.primaryMetric?.target && v.primaryMetric?.method) valFilled++;
   if (v.secondaryMetrics && v.secondaryMetrics.length > 0) valFilled++;
   if (v.statisticalApproach) valFilled++;
@@ -222,16 +211,10 @@ export function computeLabReadiness(
   ];
 
   const totalWeight = factors.reduce((s, f) => s + f.weight, 0);
-  const score = Math.round(
-    factors.reduce((s, f) => s + (f.score * f.weight) / totalWeight, 0),
-  );
+  const score = Math.round(factors.reduce((s, f) => s + (f.score * f.weight) / totalWeight, 0));
 
   const status: LabReadinessStatus =
-    score >= 80
-      ? "Lab-Ready Candidate"
-      : score >= 55
-        ? "Review Needed"
-        : "Draft";
+    score >= 80 ? "Lab-Ready Candidate" : score >= 55 ? "Review Needed" : "Draft";
 
   // Top 3 reasons — mix strongest and weakest factors so the user sees both.
   const sortedDesc = [...factors].sort((a, b) => b.score - a.score);

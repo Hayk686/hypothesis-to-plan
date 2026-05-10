@@ -40,7 +40,9 @@ export function LabReadinessCard({ report, variant = "full" }: Props) {
             <span className="font-display text-3xl font-bold text-primary">{score}</span>
             <span className="text-xs text-muted-foreground">/100</span>
           </div>
-          <Badge className={statusClass} variant="secondary">{status}</Badge>
+          <Badge className={statusClass} variant="secondary">
+            {status}
+          </Badge>
         </div>
       </div>
 
@@ -104,9 +106,7 @@ export function LabReadinessCard({ report, variant = "full" }: Props) {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium">{f.label}</span>
-                  <span className="font-mono text-xs text-primary">
-                    {Math.round(f.score)}/100
-                  </span>
+                  <span className="font-mono text-xs text-primary">{Math.round(f.score)}/100</span>
                 </div>
                 <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
                   <div

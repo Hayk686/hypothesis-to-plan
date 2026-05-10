@@ -1,15 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Cpu,
-  Database,
-  Server,
-  Cloud,
-  Sparkles,
-  Layers,
-  Network,
-  Info,
-} from "lucide-react";
+import { Cpu, Database, Server, Cloud, Sparkles, Layers, Network, Info } from "lucide-react";
 import { TECH_STACK } from "@/lib/services";
 
 type Variant = "full" | "compact";
@@ -39,32 +30,18 @@ export function TechStackPanel({ variant = "full" }: { variant?: Variant }) {
 
       <div
         className={
-          isCompact
-            ? "grid gap-3 md:grid-cols-2"
-            : "grid gap-3 md:grid-cols-2 lg:grid-cols-3"
+          isCompact ? "grid gap-3 md:grid-cols-2" : "grid gap-3 md:grid-cols-2 lg:grid-cols-3"
         }
       >
         <Group icon={Cpu} title="Frontend" items={[...TECH_STACK.frontend]} />
-        <Group
-          icon={Server}
-          title="Backend (planned)"
-          items={[...TECH_STACK.backendPlanned]}
-        />
+        <Group icon={Server} title="Backend (planned)" items={[...TECH_STACK.backendPlanned]} />
         <Group
           icon={Sparkles}
           title="LLM layer (planned)"
           items={[...TECH_STACK.llmLayerPlanned]}
         />
-        <Group
-          icon={Database}
-          title="Database (planned)"
-          items={[...TECH_STACK.databasePlanned]}
-        />
-        <Group
-          icon={Cloud}
-          title="Hosting (planned)"
-          items={[...TECH_STACK.hostingPlanned]}
-        />
+        <Group icon={Database} title="Database (planned)" items={[...TECH_STACK.databasePlanned]} />
+        <Group icon={Cloud} title="Hosting (planned)" items={[...TECH_STACK.hostingPlanned]} />
 
         <div className="rounded-lg border border-border/60 bg-background/50 p-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
@@ -76,16 +53,11 @@ export function TechStackPanel({ variant = "full" }: { variant?: Variant }) {
               <li key={api.name}>
                 <div className="font-medium">
                   {api.name}{" "}
-                  <span className="text-xs font-normal text-muted-foreground">
-                    — {api.purpose}
-                  </span>
+                  <span className="text-xs font-normal text-muted-foreground">— {api.purpose}</span>
                 </div>
                 <ul className="mt-1 space-y-0.5">
                   {api.endpoints.map((ep) => (
-                    <li
-                      key={ep}
-                      className="font-mono text-[11px] text-muted-foreground"
-                    >
+                    <li key={ep} className="font-mono text-[11px] text-muted-foreground">
                       {ep}
                     </li>
                   ))}

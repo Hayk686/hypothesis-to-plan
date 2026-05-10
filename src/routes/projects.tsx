@@ -41,7 +41,10 @@ function ProjectsPage() {
             </p>
           </div>
           <Button asChild className="bg-gradient-hero shadow-glow">
-            <Link to="/new"><Plus className="mr-2 h-4 w-4" />New project</Link>
+            <Link to="/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New project
+            </Link>
           </Button>
         </div>
 
@@ -52,11 +55,15 @@ function ProjectsPage() {
             </div>
             <h3 className="font-display text-xl font-semibold">No projects yet</h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              Start by entering a hypothesis or open the preloaded demo to see what a finished plan looks like.
+              Start by entering a hypothesis or open the preloaded demo to see what a finished plan
+              looks like.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <Button asChild className="bg-gradient-hero shadow-glow">
-                <Link to="/new"><Plus className="mr-2 h-4 w-4" />New project</Link>
+                <Link to="/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New project
+                </Link>
               </Button>
               <Button asChild variant="outline">
                 <Link to="/project/$id" params={{ id: DEMO_PROJECT.id }}>
@@ -73,7 +80,9 @@ function ProjectsPage() {
                 className="group flex flex-col border-border/60 bg-gradient-card p-6 transition-smooth hover:border-primary/40 hover:shadow-elegant"
               >
                 <div className="mb-3 flex items-start justify-between gap-2">
-                  <Badge variant="outline" className="text-xs">{p.domain.split(" / ")[0]}</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {p.domain.split(" / ")[0]}
+                  </Badge>
                   {p.id === DEMO_PROJECT.id && (
                     <Badge className="bg-primary/15 text-primary hover:bg-primary/20">
                       <Sparkles className="mr-1 h-3 w-3" /> Demo
@@ -90,15 +99,24 @@ function ProjectsPage() {
                 <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border/60 pt-4 text-xs">
                   <div>
                     <div className="text-muted-foreground">Novelty</div>
-                    <div className="mt-0.5 font-mono font-semibold text-primary">{p.noveltyScore}</div>
+                    <div className="mt-0.5 font-mono font-semibold text-primary">
+                      {p.noveltyScore}
+                    </div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" /> Wks</div>
+                    <div className="text-muted-foreground flex items-center gap-1">
+                      <Calendar className="h-3 w-3" /> Wks
+                    </div>
                     <div className="mt-0.5 font-mono font-semibold">{p.timelineWeeks}</div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground flex items-center gap-1"><DollarSign className="h-3 w-3" />Bgt</div>
-                    <div className="mt-0.5 font-mono font-semibold">${(p.budget / 1000).toFixed(0)}k</div>
+                    <div className="text-muted-foreground flex items-center gap-1">
+                      <DollarSign className="h-3 w-3" />
+                      Bgt
+                    </div>
+                    <div className="mt-0.5 font-mono font-semibold">
+                      ${(p.budget / 1000).toFixed(0)}k
+                    </div>
                   </div>
                 </div>
 

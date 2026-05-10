@@ -5,20 +5,49 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  ArrowLeft, ExternalLink, Sparkles, FileSearch, Beaker, ShoppingCart,
-  Calendar, CheckCircle2, ShieldAlert, Download, Quote, Presentation,
-  Lightbulb, AlertCircle, Target, Copy, Check, MessagesSquare,
+  ArrowLeft,
+  ExternalLink,
+  Sparkles,
+  FileSearch,
+  Beaker,
+  ShoppingCart,
+  Calendar,
+  CheckCircle2,
+  ShieldAlert,
+  Download,
+  Quote,
+  Presentation,
+  Lightbulb,
+  AlertCircle,
+  Target,
+  Copy,
+  Check,
+  MessagesSquare,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  getProject, generatePlan, CATALOG_VERIFY_REQUIRED,
-  type Project, type GeneratedPlan, type Paper,
+  getProject,
+  generatePlan,
+  CATALOG_VERIFY_REQUIRED,
+  type Project,
+  type GeneratedPlan,
+  type Paper,
 } from "@/lib/mockData";
-import { searchLiterature, type DataSource, type LiteratureDebug, type LivePlanResponse } from "@/lib/services";
+import {
+  searchLiterature,
+  type DataSource,
+  type LiteratureDebug,
+  type LivePlanResponse,
+} from "@/lib/services";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { TechStackPanel } from "@/components/TechStackPanel";
 import { LabReadinessCard } from "@/components/LabReadinessCard";
@@ -40,7 +69,9 @@ export const Route = createFileRoute("/project/$id")({
       <div className="mx-auto max-w-4xl px-6 py-24 text-center">
         <h1 className="text-4xl font-bold">Project not found</h1>
         <p className="mt-3 text-muted-foreground">It may have been deleted.</p>
-        <Button asChild className="mt-6"><Link to="/projects">Back to projects</Link></Button>
+        <Button asChild className="mt-6">
+          <Link to="/projects">Back to projects</Link>
+        </Button>
       </div>
     </div>
   ),
@@ -68,10 +99,29 @@ function ProjectPage() {
     if (!p) throw notFound();
     setProject(p);
     setPlan(generatePlan(p));
-    // NOTE: We intentionally do NOT call the live Semantic Scholar API on
-    // initial render. The page must load with verified seeded data even with
-    // no internet, no API key, or an upstream failure. The user can opt in
-    // via the "Refresh from Semantic Scholar" button in the Evidence tab.
+    setLivePapers(null);
+    setPaperSource("seed");
+    setPaperSourceNote("");
+    setLiteratureDebug(null);
+
+    if (p.id !== "demo-trehalose-hela-001") {
+      setLiteratureLoading(true);
+      const query = `${p.hypothesis} ${p.domain} ${p.organism}`.trim() || p.title;
+      searchLiterature(query)
+        .then((res) => {
+          setLivePapers(res.data);
+          setPaperSource(res.source);
+          setPaperSourceNote(res.note ?? "");
+          setLiteratureDebug(res.debug ?? null);
+        })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : "live literature refresh failed";
+          setLivePapers([]);
+          setPaperSource("fallback");
+          setPaperSourceNote(`Live literature refresh failed: ${msg}`);
+        })
+        .finally(() => setLiteratureLoading(false));
+    }
   }, [id]);
 
   const handleRefreshLiterature = async () => {
@@ -79,8 +129,7 @@ function ProjectPage() {
     setLiteratureLoading(true);
     try {
       const query =
-        `${project.hypothesis} ${project.domain} ${project.organism}`.trim() ||
-        project.title;
+        `${project.hypothesis} ${project.domain} ${project.organism}`.trim() || project.title;
       const res = await searchLiterature(query);
       setLivePapers(res.data);
       setPaperSource(res.source);
@@ -93,9 +142,7 @@ function ProjectPage() {
       const liveCount = res.source === "live-api" ? res.data.length : 0;
       const livePlanLitCount = livePlan?.evidence_map?.length ?? 0;
       const livePlanLitOk =
-        !!livePlan &&
-        livePlan.warnings.uses_fallback_literature === false &&
-        livePlanLitCount > 0;
+        !!livePlan && livePlan.warnings.uses_fallback_literature === false && livePlanLitCount > 0;
 
       if (res.source === "live-api" && liveCount > 0) {
         toast.success("Live literature loaded", {
@@ -147,9 +194,7 @@ function ProjectPage() {
   }
 
   // Effective values: prefer livePlan when present, else fall back to seeded plan.
-  const liveTotalBudget = livePlan
-    ? livePlan.materials_budget.items.reduce((s, m) => s + m.unit_cost, 0)
-    : null;
+  const liveTotalBudget = livePlan ? livePlan.materials_budget.subtotal_verified : null;
   const totalBudget = liveTotalBudget ?? plan.materials.reduce((s, m) => s + m.total, 0);
   const protocolLiveStatus = livePlan
     ? {
@@ -166,10 +211,10 @@ function ProjectPage() {
     !!livePlan && (livePlan.warnings.uses_fallback_protocols || hasMissingCatalogs);
   const liveScore = livePlan ? livePlan.lab_readiness_score : baseReadiness.score;
   const finalScore = mustCapBelow90 ? Math.min(liveScore, 89) : liveScore;
-  const labReadiness = livePlan
-    ? { ...baseReadiness, score: finalScore }
-    : baseReadiness;
-  const planText = formatPlanAsMarkdown(project, plan, totalBudget);
+  const labReadiness = livePlan ? { ...baseReadiness, score: finalScore } : baseReadiness;
+  const planText = livePlan
+    ? formatLivePlanAsMarkdown(project, livePlan)
+    : formatPlanAsMarkdown(project, plan, totalBudget);
 
   const handleCopy = async () => {
     try {
@@ -205,7 +250,10 @@ function ProjectPage() {
       <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Breadcrumb + actions */}
         <div className="mb-4 flex items-center justify-between gap-4">
-          <Link to="/projects" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            to="/projects"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="mr-1 h-3 w-3" /> All projects
           </Link>
           <div className="flex flex-wrap items-center gap-2">
@@ -213,13 +261,19 @@ function ProjectPage() {
               variant="outline"
               size="sm"
               onClick={() => {
-                document.getElementById("scientist-review")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                document
+                  .getElementById("scientist-review")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
             >
               <MessagesSquare className="mr-2 h-4 w-4" /> Scientist Review
             </Button>
             <Button variant="outline" size="sm" onClick={handleCopy}>
-              {copied ? <Check className="mr-2 h-4 w-4 text-success" /> : <Copy className="mr-2 h-4 w-4" />}
+              {copied ? (
+                <Check className="mr-2 h-4 w-4 text-success" />
+              ) : (
+                <Copy className="mr-2 h-4 w-4" />
+              )}
               {copied ? "Copied" : "Copy plan"}
             </Button>
             <Button size="sm" onClick={handleDownload}>
@@ -238,7 +292,9 @@ function ProjectPage() {
         {/* Challenge 4 flow banner */}
         <Card className="mb-4 border-primary/30 bg-primary/5 p-3">
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Badge className="bg-primary/15 text-primary hover:bg-primary/20">Challenge 4 flow</Badge>
+            <Badge className="bg-primary/15 text-primary hover:bg-primary/20">
+              Challenge 4 flow
+            </Badge>
             <span className="font-mono text-foreground/80">
               Hypothesis <span className="text-primary">→</span> Literature QC{" "}
               <span className="text-primary">→</span> Runnable Experiment Plan{" "}
@@ -251,7 +307,8 @@ function ProjectPage() {
         <div className="mb-6 rounded-md border border-dashed border-border/60 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
           <span className="font-mono">
             Live Semantic Scholar search is routed through{" "}
-            <span className="text-foreground/80">/api/search-papers</span> server proxy with verified fallback for demo stability.
+            <span className="text-foreground/80">/api/search-papers</span> server proxy with
+            verified fallback for demo stability.
           </span>
         </div>
 
@@ -261,7 +318,11 @@ function ProjectPage() {
             <div className="min-w-0 flex-1">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{project.domain}</Badge>
-                {project.organism && <Badge variant="outline" className="bg-accent/30">{project.organism}</Badge>}
+                {project.organism && (
+                  <Badge variant="outline" className="bg-accent/30">
+                    {project.organism}
+                  </Badge>
+                )}
                 <Badge className="bg-success/15 text-success hover:bg-success/20">Plan ready</Badge>
               </div>
               <h1 className="text-3xl font-bold leading-tight tracking-tight md:text-4xl">
@@ -275,13 +336,17 @@ function ProjectPage() {
                 <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                   {project.resources && (
                     <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
-                      <span className="font-mono uppercase tracking-wider text-foreground/60">Resources</span>
+                      <span className="font-mono uppercase tracking-wider text-foreground/60">
+                        Resources
+                      </span>
                       <div className="mt-0.5 text-foreground/75">{project.resources}</div>
                     </div>
                   )}
                   {project.constraints && (
                     <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
-                      <span className="font-mono uppercase tracking-wider text-foreground/60">Constraints</span>
+                      <span className="font-mono uppercase tracking-wider text-foreground/60">
+                        Constraints
+                      </span>
                       <div className="mt-0.5 text-foreground/75">{project.constraints}</div>
                     </div>
                   )}
@@ -292,11 +357,31 @@ function ProjectPage() {
 
           {/* Top summary cards */}
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
-            <ScoreCard label="Novelty Score" value={plan.noveltyScore} helper="How original vs. published corpus" />
-            <ScoreCard label="Feasibility Score" value={plan.feasibilityScore} helper="Plan realism given budget & time" />
-            <ScoreCard label="Evidence Confidence" value={plan.evidenceConfidence} helper="Strength of supporting literature" />
-            <StatCard label="Estimated Cost" value={`$${(totalBudget / 1000).toFixed(1)}k`} helper={`${plan.materials.length} line items`} />
-            <StatCard label="Estimated Duration" value={`${plan.timeline.length} wks`} helper={`${plan.protocol.length} protocol phases`} />
+            <ScoreCard
+              label="Novelty Score"
+              value={plan.noveltyScore}
+              helper="How original vs. published corpus"
+            />
+            <ScoreCard
+              label="Feasibility Score"
+              value={plan.feasibilityScore}
+              helper="Plan realism given budget & time"
+            />
+            <ScoreCard
+              label="Evidence Confidence"
+              value={plan.evidenceConfidence}
+              helper="Strength of supporting literature"
+            />
+            <StatCard
+              label="Estimated Cost"
+              value={`$${(totalBudget / 1000).toFixed(1)}k`}
+              helper={`${plan.materials.length} line items`}
+            />
+            <StatCard
+              label="Estimated Duration"
+              value={`${plan.timeline.length} wks`}
+              helper={`${plan.protocol.length} protocol phases`}
+            />
           </div>
 
           {/* Literature QC banner */}
@@ -314,19 +399,17 @@ function ProjectPage() {
             <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
               <VerificationBadge verification={{ status: "pending" }} />
               <span className="text-foreground/80">
-                Demo data is seeded for layout — every literature reference, protocol source, and catalog number is marked
-                <span className="font-mono"> pending verification</span> until a real source is attached.
+                Demo data is seeded for layout — every literature reference, protocol source, and
+                catalog number is marked
+                <span className="font-mono"> pending verification</span> until a real source is
+                attached.
               </span>
             </div>
           )}
         </Card>
 
         {/* Real-data pipeline (opt-in) */}
-        <LivePipelinePanel
-          project={project}
-          livePlan={livePlan}
-          onResult={setLivePlan}
-        />
+        <LivePipelinePanel project={project} livePlan={livePlan} onResult={setLivePlan} />
 
         {/* Lab Readiness */}
         <div className="mb-6">
@@ -336,13 +419,27 @@ function ProjectPage() {
         {/* Tabs */}
         <Tabs defaultValue="evidence" className="w-full">
           <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-muted/50 p-1">
-            <TabTrig value="evidence" icon={FileSearch}>Evidence</TabTrig>
-            <TabTrig value="novelty" icon={Sparkles}>Novelty Analysis</TabTrig>
-            <TabTrig value="protocol" icon={Beaker}>Protocol</TabTrig>
-            <TabTrig value="materials" icon={ShoppingCart}>Materials & Budget</TabTrig>
-            <TabTrig value="timeline" icon={Calendar}>Timeline</TabTrig>
-            <TabTrig value="validation" icon={CheckCircle2}>Validation</TabTrig>
-            <TabTrig value="risks" icon={ShieldAlert}>Risks</TabTrig>
+            <TabTrig value="evidence" icon={FileSearch}>
+              Evidence
+            </TabTrig>
+            <TabTrig value="novelty" icon={Sparkles}>
+              Novelty Analysis
+            </TabTrig>
+            <TabTrig value="protocol" icon={Beaker}>
+              Protocol
+            </TabTrig>
+            <TabTrig value="materials" icon={ShoppingCart}>
+              Materials & Budget
+            </TabTrig>
+            <TabTrig value="timeline" icon={Calendar}>
+              Timeline
+            </TabTrig>
+            <TabTrig value="validation" icon={CheckCircle2}>
+              Validation
+            </TabTrig>
+            <TabTrig value="risks" icon={ShieldAlert}>
+              Risks
+            </TabTrig>
           </TabsList>
 
           {/* EVIDENCE */}
@@ -352,12 +449,18 @@ function ProjectPage() {
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <FileSearch className="h-4 w-4 text-success" />
-                    <h3 className="font-display text-sm font-semibold">Live evidence ({livePlan.evidence_map.length})</h3>
+                    <h3 className="font-display text-sm font-semibold">
+                      Live evidence ({livePlan.evidence_map.length})
+                    </h3>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     <SourceBadge source="live-semantic-scholar" />
-                    {livePlan.evidence_map.some((e) => e.source === "pubmed") && <SourceBadge source="pubmed" />}
-                    {livePlan.warnings.uses_fallback_literature && <SourceBadge source="curated-fallback" fallback />}
+                    {livePlan.evidence_map.some((e) => e.source === "pubmed") && (
+                      <SourceBadge source="pubmed" />
+                    )}
+                    {livePlan.warnings.uses_fallback_literature && (
+                      <SourceBadge source="curated-fallback" fallback />
+                    )}
                   </div>
                 </div>
                 <div className="grid gap-2 md:grid-cols-2">
@@ -376,14 +479,17 @@ function ProjectPage() {
                         <span>·</span>
                         <span>{Math.round(e.relevance_score * 100)}% rel.</span>
                       </div>
-                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-snug">{e.title}</div>
+                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-snug">
+                        {e.title}
+                      </div>
                       <div className="mt-0.5 text-[11px] text-muted-foreground">{e.venue}</div>
                     </a>
                   ))}
                 </div>
                 <div className="mt-2 text-[11px] text-muted-foreground">
                   <span className="font-mono">Literature QC:</span>{" "}
-                  <span className="text-foreground/80">{livePlan.literature_qc.result}</span> — {livePlan.literature_qc.reason}
+                  <span className="text-foreground/80">{livePlan.literature_qc.result}</span> —{" "}
+                  {livePlan.literature_qc.reason}
                 </div>
               </Card>
             )}
@@ -395,6 +501,7 @@ function ProjectPage() {
               // panel after a /api/generate-plan run.
               const liveLit = livePlan?.source_status?.literature ?? null;
               const liveEvidence = livePlan?.evidence_map ?? null;
+              const isDemoProject = project.id === "demo-trehalose-hela-001";
 
               const displayPapers: Paper[] =
                 liveEvidence && liveEvidence.length > 0
@@ -426,7 +533,7 @@ function ProjectPage() {
                         checkedAt: new Date().toISOString().slice(0, 10),
                       },
                     }))
-                  : (livePapers ?? plan.papers);
+                  : (livePapers ?? (isDemoProject ? plan.papers : []));
 
               const isRateLimited = /rate limit/i.test(paperSourceNote);
               const sourceLabel = liveLit
@@ -438,15 +545,23 @@ function ProjectPage() {
                   : paperSource === "fallback"
                     ? isRateLimited
                       ? "Rate limited — using verified seeded fallback"
-                      : "Verified seeded fallback"
-                    : "Verified seeded data";
+                      : isDemoProject
+                        ? "Verified seeded fallback"
+                        : "Live literature unavailable"
+                    : isDemoProject
+                      ? "Verified seeded data"
+                      : literatureLoading
+                        ? "Querying Semantic Scholar"
+                        : "Live literature pending";
               const sourceClass = liveLit
                 ? liveLit.ok
                   ? "border-success/40 bg-success/10 text-success"
                   : "border-warning/40 bg-warning/10 text-warning-foreground"
                 : paperSource === "live-api"
                   ? "border-success/40 bg-success/10 text-success"
-                  : "border-warning/40 bg-warning/10 text-warning-foreground";
+                  : literatureLoading
+                    ? "border-primary/40 bg-primary/10 text-primary"
+                    : "border-warning/40 bg-warning/10 text-warning-foreground";
               const sourceNote = liveLit
                 ? liveLit.ok
                   ? `Returned ${displayPapers.length} papers via Semantic Scholar.`
@@ -460,7 +575,10 @@ function ProjectPage() {
                   />
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className={`text-[10px] uppercase tracking-wider ${sourceClass}`}>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] uppercase tracking-wider ${sourceClass}`}
+                      >
                         {literatureLoading ? "Querying Semantic Scholar…" : sourceLabel}
                       </Badge>
                       {sourceNote && (
@@ -479,64 +597,99 @@ function ProjectPage() {
                   </div>
                   {literatureDebug && !liveLit && (
                     <div className="rounded-md border border-dashed border-border/60 bg-muted/30 px-3 py-2 font-mono text-[11px] text-muted-foreground">
-                      <span className="mr-3">Proxy: {literatureDebug.proxyUsed ? "active" : "off"}</span>
-                      <span className="mr-3">API key detected: {literatureDebug.hasApiKey ? "yes" : "no"}</span>
-                      <span className="mr-3">Semantic Scholar status: {literatureDebug.semanticScholarStatus || "—"}</span>
+                      <span className="mr-3">
+                        Proxy: {literatureDebug.proxyUsed ? "active" : "off"}
+                      </span>
+                      <span className="mr-3">
+                        API key detected: {literatureDebug.hasApiKey ? "yes" : "no"}
+                      </span>
+                      <span className="mr-3">
+                        Semantic Scholar status: {literatureDebug.semanticScholarStatus || "—"}
+                      </span>
                       <span>Source: {paperSource === "live-api" ? "live" : "fallback"}</span>
                     </div>
                   )}
+                  {displayPapers.length === 0 && (
+                    <Card className="border-border/60 bg-card p-5">
+                      <div className="font-display text-sm font-semibold">
+                        No live references loaded
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        This user-created project is not showing seeded HeLa literature. Use the
+                        refresh button or the real-data pipeline to query live sources for this
+                        hypothesis.
+                      </p>
+                    </Card>
+                  )}
                   {displayPapers.map((paper) => (
-              <Card key={paper.id} className="border-border/60 bg-gradient-card p-5 transition-smooth hover:border-primary/40">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-display text-base font-semibold leading-snug">{paper.title}</h4>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                      {paper.authors} · <span className="italic">{paper.venue}</span> · {paper.year}
-                    </div>
-                    <p className="mt-3 text-sm text-foreground/80">{paper.abstract}</p>
-                    <div className="mt-3 rounded-md border-l-2 border-primary/60 bg-primary/5 p-3">
-                      <div className="flex items-start gap-2">
-                        <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                        <div>
-                          <div className="font-mono text-[10px] uppercase tracking-wider text-primary">Why it matters</div>
-                          <div className="text-sm text-foreground/85">{paper.whyItMatters}</div>
+                    <Card
+                      key={paper.id}
+                      className="border-border/60 bg-gradient-card p-5 transition-smooth hover:border-primary/40"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-display text-base font-semibold leading-snug">
+                            {paper.title}
+                          </h4>
+                          <div className="mt-1 text-sm text-muted-foreground">
+                            {paper.authors} · <span className="italic">{paper.venue}</span> ·{" "}
+                            {paper.year}
+                          </div>
+                          <p className="mt-3 text-sm text-foreground/80">{paper.abstract}</p>
+                          <div className="mt-3 rounded-md border-l-2 border-primary/60 bg-primary/5 p-3">
+                            <div className="flex items-start gap-2">
+                              <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                              <div>
+                                <div className="font-mono text-[10px] uppercase tracking-wider text-primary">
+                                  Why it matters
+                                </div>
+                                <div className="text-sm text-foreground/85">
+                                  {paper.whyItMatters}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          <Badge variant="secondary" className="bg-primary/10 text-primary">
+                            {Math.round(paper.similarity * 100)}% relevance
+                          </Badge>
+                          {paper.citations > 0 && (
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {paper.citations} cites
+                            </span>
+                          )}
+                          {(() => {
+                            const href =
+                              paper.verification?.sourceUrl ??
+                              (paper.doi.startsWith("http")
+                                ? paper.doi
+                                : `https://doi.org/${paper.doi}`);
+                            return (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-xs text-primary hover:underline"
+                              >
+                                Open source <ExternalLink className="ml-1 h-3 w-3" />
+                              </a>
+                            );
+                          })()}
+                          <VerificationBadge verification={paper.verification} />
+                          {paper.verification?.note
+                            ?.toLowerCase()
+                            .startsWith("supporting source") && (
+                            <Badge
+                              variant="outline"
+                              className="border-warning/40 bg-warning/10 font-mono text-[10px] uppercase tracking-wider text-warning-foreground"
+                            >
+                              Supporting source
+                            </Badge>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-2">
-                    <Badge variant="secondary" className="bg-primary/10 text-primary">
-                      {Math.round(paper.similarity * 100)}% relevance
-                    </Badge>
-                    {paper.citations > 0 && (
-                      <span className="font-mono text-xs text-muted-foreground">{paper.citations} cites</span>
-                    )}
-                    {(() => {
-                      const href = paper.verification?.sourceUrl
-                        ?? (paper.doi.startsWith("http") ? paper.doi : `https://doi.org/${paper.doi}`);
-                      return (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center text-xs text-primary hover:underline"
-                        >
-                          Open source <ExternalLink className="ml-1 h-3 w-3" />
-                        </a>
-                      );
-                    })()}
-                    <VerificationBadge verification={paper.verification} />
-                    {paper.verification?.note?.toLowerCase().startsWith("supporting source") && (
-                      <Badge
-                        variant="outline"
-                        className="border-warning/40 bg-warning/10 font-mono text-[10px] uppercase tracking-wider text-warning-foreground"
-                      >
-                        Supporting source
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </Card>
+                    </Card>
                   ))}
                 </>
               );
@@ -549,9 +702,22 @@ function ProjectPage() {
               <div className="flex flex-wrap items-center gap-8">
                 <div className="relative flex h-40 w-40 shrink-0 items-center justify-center">
                   <svg className="absolute inset-0 -rotate-90" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="8" fill="none" className="text-muted" />
                     <circle
-                      cx="50" cy="50" r="42" stroke="url(#grad)" strokeWidth="8" fill="none"
+                      cx="50"
+                      cy="50"
+                      r="42"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      fill="none"
+                      className="text-muted"
+                    />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="42"
+                      stroke="url(#grad)"
+                      strokeWidth="8"
+                      fill="none"
                       strokeDasharray={`${(plan.noveltyScore / 100) * 264} 264`}
                       strokeLinecap="round"
                     />
@@ -563,8 +729,12 @@ function ProjectPage() {
                     </defs>
                   </svg>
                   <div className="text-center">
-                    <div className="font-display text-4xl font-bold text-primary">{plan.noveltyScore}</div>
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">Novelty</div>
+                    <div className="font-display text-4xl font-bold text-primary">
+                      {plan.noveltyScore}
+                    </div>
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Novelty
+                    </div>
                   </div>
                 </div>
                 <div className="flex-1">
@@ -595,7 +765,9 @@ function ProjectPage() {
               <Card className="border-border/60 bg-gradient-card p-6">
                 <div className="mb-3 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-warning-foreground" />
-                  <h3 className="font-display text-base font-semibold">What is missing in the literature</h3>
+                  <h3 className="font-display text-base font-semibold">
+                    What is missing in the literature
+                  </h3>
                 </div>
                 <ul className="space-y-2 text-sm">
                   {plan.noveltyAnalysis.whatIsMissing.map((k, i) => (
@@ -611,7 +783,9 @@ function ProjectPage() {
             <Card className="border-border/60 bg-gradient-card p-6">
               <div className="mb-2 flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />
-                <h3 className="font-display text-base font-semibold">Why this hypothesis may be novel</h3>
+                <h3 className="font-display text-base font-semibold">
+                  Why this hypothesis may be novel
+                </h3>
               </div>
               <p className="text-foreground/80">{plan.noveltyAnalysis.whyNovel}</p>
             </Card>
@@ -619,7 +793,9 @@ function ProjectPage() {
             <Card className="border-primary/30 bg-primary/5 p-6">
               <div className="mb-2 flex items-center gap-2">
                 <Target className="h-4 w-4 text-primary" />
-                <h3 className="font-display text-base font-semibold text-primary">Recommended refinement</h3>
+                <h3 className="font-display text-base font-semibold text-primary">
+                  Recommended refinement
+                </h3>
               </div>
               <p className="text-foreground/85">{plan.noveltyAnalysis.refinement}</p>
             </Card>
@@ -642,25 +818,33 @@ function ProjectPage() {
                     {livePlan.protocols.some((p) => p.source === "protocols.io") && (
                       <SourceBadge source="protocols.io" />
                     )}
-                    {livePlan.warnings.uses_fallback_protocols && <SourceBadge source="curated-fallback" fallback />}
+                    {livePlan.warnings.uses_fallback_protocols && (
+                      <SourceBadge source="curated-fallback" fallback />
+                    )}
                   </div>
                 </div>
-                {livePlan.warnings.uses_fallback_protocols && (() => {
-                  const ps = livePlan.source_status?.protocols;
-                  const reason = ps?.reason ?? "";
-                  const statusMatch = reason.match(/HTTP\s+(\d+|—)/i);
-                  const statusCode = statusMatch?.[1] ?? "error";
-                  return (
-                    <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1.5">
-                      <Badge variant="outline" className="border-warning/60 bg-warning/20 text-[10px] font-mono uppercase tracking-wider text-warning-foreground">
-                        protocols.io HTTP {statusCode} → curated fallback used
-                      </Badge>
-                      {reason && (
-                        <span className="text-[11px] text-muted-foreground line-clamp-1">{reason}</span>
-                      )}
-                    </div>
-                  );
-                })()}
+                {livePlan.warnings.uses_fallback_protocols &&
+                  (() => {
+                    const ps = livePlan.source_status?.protocols;
+                    const reason = ps?.reason ?? "";
+                    const statusMatch = reason.match(/HTTP\s+(\d+|—)/i);
+                    const statusCode = statusMatch?.[1] ?? "error";
+                    return (
+                      <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1.5">
+                        <Badge
+                          variant="outline"
+                          className="border-warning/60 bg-warning/20 text-[10px] font-mono uppercase tracking-wider text-warning-foreground"
+                        >
+                          protocols.io HTTP {statusCode} → curated fallback used
+                        </Badge>
+                        {reason && (
+                          <span className="text-[11px] text-muted-foreground line-clamp-1">
+                            {reason}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 <div className="grid gap-2 md:grid-cols-2">
                   {livePlan.protocols.map((p) => (
                     <a
@@ -675,7 +859,9 @@ function ProjectPage() {
                         <span>·</span>
                         <span>{Math.round(p.relevance_score * 100)}% rel.</span>
                       </div>
-                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-snug">{p.title}</div>
+                      <div className="mt-1 line-clamp-2 text-sm font-medium leading-snug">
+                        {p.title}
+                      </div>
                       {p.matched_keywords.length > 0 && (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {p.matched_keywords.slice(0, 4).map((k) => (
@@ -690,7 +876,10 @@ function ProjectPage() {
                 </div>
               </Card>
             )}
-            <SectionHeader title="Experimental protocol" subtitle={`${plan.protocol.length} phases — preparation through expected outputs`} />
+            <SectionHeader
+              title="Experimental protocol"
+              subtitle={`${plan.protocol.length} phases — preparation through expected outputs`}
+            />
             <div className="space-y-3">
               {plan.protocol.map((step) => (
                 <Card key={step.step} className="border-border/60 bg-gradient-card p-5">
@@ -701,14 +890,18 @@ function ProjectPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline gap-2">
                         <h4 className="font-display text-base font-semibold">{step.title}</h4>
-                        <Badge variant="outline" className="text-xs">{step.phase}</Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {step.phase}
+                        </Badge>
                         <span className="text-xs text-muted-foreground">· {step.duration}</span>
                         <VerificationBadge verification={step.protocolSource} compact />
                       </div>
                       <p className="mt-1.5 text-sm text-foreground/80">{step.description}</p>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {step.equipment.map((e) => (
-                          <Badge key={e} variant="secondary" className="font-mono text-xs">{e}</Badge>
+                          <Badge key={e} variant="secondary" className="font-mono text-xs">
+                            {e}
+                          </Badge>
                         ))}
                       </div>
                     </div>
@@ -736,8 +929,8 @@ function ProjectPage() {
                       <SourceBadge source="verified-supplier" />
                     )}
                     <Badge variant="outline" className="text-[10px]">
-                      Subtotal ${livePlan.materials_budget.subtotal_verified.toLocaleString()} /
-                      cap ${livePlan.materials_budget.budget_cap.toLocaleString()}
+                      Subtotal ${livePlan.materials_budget.subtotal_verified.toLocaleString()} / cap
+                      ${livePlan.materials_budget.budget_cap.toLocaleString()}
                     </Badge>
                   </div>
                 </div>
@@ -764,15 +957,25 @@ function ProjectPage() {
                             {m.catalog}
                           </a>
                         ) : (
-                          <span className="font-mono text-[11px] text-muted-foreground">{m.catalog}</span>
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {m.catalog}
+                          </span>
                         )}
-                        <span className="font-mono text-[10px]">${m.unit_cost.toLocaleString()}</span>
+                        <span className="font-mono text-[10px]">
+                          ${m.unit_cost.toLocaleString()}
+                        </span>
                         {m.verified ? (
-                          <Badge variant="outline" className="border-success/40 bg-success/10 text-[9px] text-success">
+                          <Badge
+                            variant="outline"
+                            className="border-success/40 bg-success/10 text-[9px] text-success"
+                          >
                             verified
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="border-warning/40 bg-warning/10 text-[9px] text-warning-foreground">
+                          <Badge
+                            variant="outline"
+                            className="border-warning/40 bg-warning/10 text-[9px] text-warning-foreground"
+                          >
                             verify
                           </Badge>
                         )}
@@ -783,10 +986,17 @@ function ProjectPage() {
               </Card>
             )}
             <div className="flex items-end justify-between">
-              <SectionHeader title="Materials & budget" subtitle={`${plan.materials.length} line items`} />
+              <SectionHeader
+                title="Materials & budget"
+                subtitle={`${plan.materials.length} line items`}
+              />
               <div className="text-right">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground">Total estimated cost</div>
-                <div className="font-display text-3xl font-bold text-primary">${totalBudget.toLocaleString()}</div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Total estimated cost
+                </div>
+                <div className="font-display text-3xl font-bold text-primary">
+                  ${totalBudget.toLocaleString()}
+                </div>
               </div>
             </div>
             <Card className="overflow-hidden border-border/60 bg-card p-0">
@@ -810,9 +1020,13 @@ function ProjectPage() {
                         <TableRow key={i}>
                           <TableCell>
                             <div className="font-medium">{m.name}</div>
-                            <Badge variant="outline" className="mt-1 text-[10px]">{m.category}</Badge>
+                            <Badge variant="outline" className="mt-1 text-[10px]">
+                              {m.category}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="max-w-xs text-sm text-muted-foreground">{m.purpose}</TableCell>
+                          <TableCell className="max-w-xs text-sm text-muted-foreground">
+                            {m.purpose}
+                          </TableCell>
                           <TableCell className="text-sm">
                             <div>{m.vendor}</div>
                             {needsCatalog ? (
@@ -833,27 +1047,42 @@ function ProjectPage() {
                                 {m.catalog}
                               </a>
                             ) : (
-                              <div className="font-mono text-xs text-muted-foreground">{m.catalog}</div>
-                            )}
-                            {!needsCatalog && m.verification?.note?.toLowerCase().includes("verify before ordering") && (
-                              <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-warning-foreground/80">
-                                Verify before ordering
+                              <div className="font-mono text-xs text-muted-foreground">
+                                {m.catalog}
                               </div>
                             )}
+                            {!needsCatalog &&
+                              m.verification?.note
+                                ?.toLowerCase()
+                                .includes("verify before ordering") && (
+                                <div className="mt-1 font-mono text-[10px] uppercase tracking-wider text-warning-foreground/80">
+                                  Verify before ordering
+                                </div>
+                              )}
                           </TableCell>
                           <TableCell className="text-sm">{m.quantity}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">${m.unitCost.toLocaleString()}</TableCell>
-                          <TableCell className="text-right font-mono text-sm font-semibold">${m.total.toLocaleString()}</TableCell>
-                          <TableCell><VerificationBadge verification={m.verification} compact /></TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            ${m.unitCost.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm font-semibold">
+                            ${m.total.toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            <VerificationBadge verification={m.verification} compact />
+                          </TableCell>
                         </TableRow>
                       );
                     })}
                     <TableRow className="bg-muted/40">
-                      <TableCell colSpan={5} className="text-right font-semibold">Grand total</TableCell>
+                      <TableCell colSpan={5} className="text-right font-semibold">
+                        Grand total
+                      </TableCell>
                       <TableCell className="text-right font-mono text-lg font-bold text-primary">
                         ${totalBudget.toLocaleString()}
                       </TableCell>
-                      <TableCell><VerificationBadge verification={plan.budgetSource} compact /></TableCell>
+                      <TableCell>
+                        <VerificationBadge verification={plan.budgetSource} compact />
+                      </TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -876,9 +1105,14 @@ function ProjectPage() {
                 </div>
                 <ul className="space-y-1 text-xs">
                   {livePlan.timeline.map((wk) => (
-                    <li key={wk.week} className="rounded border border-border/60 bg-background/60 px-2 py-1.5">
+                    <li
+                      key={wk.week}
+                      className="rounded border border-border/60 bg-background/60 px-2 py-1.5"
+                    >
                       <span className="font-mono text-primary">W{wk.week}</span>{" "}
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{wk.phase}</span>{" "}
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {wk.phase}
+                      </span>{" "}
                       <span className="font-medium">{wk.milestone}</span>{" "}
                       <span className="text-muted-foreground">— {wk.deliverable}</span>
                     </li>
@@ -886,13 +1120,16 @@ function ProjectPage() {
                 </ul>
                 <div className="mt-2 text-[11px] text-muted-foreground">
                   Generated from project inputs by{" "}
-                  <code className="font-mono text-foreground/80">/api/generate-plan</code>.
-                  Detailed weekly view below uses the seeded baseline.
+                  <code className="font-mono text-foreground/80">/api/generate-plan</code>. Detailed
+                  weekly view below uses the seeded baseline.
                 </div>
               </Card>
             )}
             <div className="flex flex-wrap items-end justify-between gap-3">
-              <SectionHeader title="Week-by-week timeline" subtitle={`${plan.timeline.length} weeks · ${new Set(plan.timeline.map((t) => t.phase)).size} phases`} />
+              <SectionHeader
+                title="Week-by-week timeline"
+                subtitle={`${plan.timeline.length} weeks · ${new Set(plan.timeline.map((t) => t.phase)).size} phases`}
+              />
               <VerificationBadge verification={plan.timelineSource} />
             </div>
             <div className="relative">
@@ -905,7 +1142,9 @@ function ProjectPage() {
                     </div>
                     <Card className="border-border/60 bg-gradient-card p-4 transition-smooth hover:border-primary/40">
                       <div className="flex flex-wrap items-baseline gap-2">
-                        <Badge variant="outline" className="text-xs">{wk.phase}</Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {wk.phase}
+                        </Badge>
                         <h4 className="font-display font-semibold">{wk.milestone}</h4>
                       </div>
                       <ul className="mt-2 space-y-1 text-sm text-foreground/80">
@@ -916,7 +1155,8 @@ function ProjectPage() {
                         ))}
                       </ul>
                       <div className="mt-2 text-xs text-muted-foreground">
-                        <span className="font-mono uppercase tracking-wider">Deliverable:</span> {wk.deliverable}
+                        <span className="font-mono uppercase tracking-wider">Deliverable:</span>{" "}
+                        {wk.deliverable}
                       </div>
                     </Card>
                   </div>
@@ -928,23 +1168,34 @@ function ProjectPage() {
           {/* VALIDATION */}
           <TabsContent value="validation" className="mt-6 space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
-              <SectionHeader title="Validation plan" subtitle="Primary endpoint, secondary metrics, statistical approach, controls, reproducibility" />
+              <SectionHeader
+                title="Validation plan"
+                subtitle="Primary endpoint, secondary metrics, statistical approach, controls, reproducibility"
+              />
               <VerificationBadge verification={plan.validation.source} />
             </div>
 
             <Card className="border-primary/30 bg-primary/5 p-6">
               <div className="mb-2 flex items-center gap-2">
                 <Target className="h-4 w-4 text-primary" />
-                <h3 className="font-display text-base font-semibold text-primary">Primary success metric</h3>
+                <h3 className="font-display text-base font-semibold text-primary">
+                  Primary success metric
+                </h3>
               </div>
               <div className="font-medium">{plan.validation.primaryMetric.name}</div>
               <div className="mt-2 grid gap-3 md:grid-cols-2">
                 <div className="rounded-md border border-border/60 bg-background/60 p-3">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Target</div>
-                  <div className="mt-0.5 font-mono text-primary">{plan.validation.primaryMetric.target}</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Target
+                  </div>
+                  <div className="mt-0.5 font-mono text-primary">
+                    {plan.validation.primaryMetric.target}
+                  </div>
                 </div>
                 <div className="rounded-md border border-border/60 bg-background/60 p-3">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Method</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Method
+                  </div>
                   <div className="mt-0.5 text-sm">{plan.validation.primaryMetric.method}</div>
                 </div>
               </div>
@@ -980,7 +1231,9 @@ function ProjectPage() {
                 <p className="text-sm text-foreground/80">{plan.validation.statisticalApproach}</p>
               </Card>
               <Card className="border-border/60 bg-gradient-card p-6">
-                <h3 className="mb-2 font-display text-base font-semibold">Reproducibility checks</h3>
+                <h3 className="mb-2 font-display text-base font-semibold">
+                  Reproducibility checks
+                </h3>
                 <ul className="space-y-2 text-sm">
                   {plan.validation.reproducibilityChecks.map((c, i) => (
                     <li key={i} className="flex gap-2">
@@ -994,11 +1247,15 @@ function ProjectPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <Card className="border-success/30 bg-success/5 p-5">
-                <Badge className="mb-2 bg-success/15 text-success hover:bg-success/20">Positive control</Badge>
+                <Badge className="mb-2 bg-success/15 text-success hover:bg-success/20">
+                  Positive control
+                </Badge>
                 <p className="text-sm text-foreground/85">{plan.validation.positiveControl}</p>
               </Card>
               <Card className="border-muted/50 bg-muted/20 p-5">
-                <Badge variant="outline" className="mb-2">Negative control</Badge>
+                <Badge variant="outline" className="mb-2">
+                  Negative control
+                </Badge>
                 <p className="text-sm text-foreground/85">{plan.validation.negativeControl}</p>
               </Card>
             </div>
@@ -1006,20 +1263,27 @@ function ProjectPage() {
 
           {/* RISKS */}
           <TabsContent value="risks" className="mt-6 space-y-4">
-            <SectionHeader title="Risks & mitigations" subtitle={`${plan.risks.length} risks across scientific, operational, budget, and ethical/safety categories`} />
+            <SectionHeader
+              title="Risks & mitigations"
+              subtitle={`${plan.risks.length} risks across scientific, operational, budget, and ethical/safety categories`}
+            />
             <div className="grid gap-3 md:grid-cols-2">
               {plan.risks.map((r) => (
                 <Card key={r.id} className="border-border/60 bg-gradient-card p-5">
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <h4 className="font-display font-semibold leading-tight">{r.title}</h4>
-                    <Badge variant="outline" className="shrink-0 text-xs capitalize">{r.category}</Badge>
+                    <Badge variant="outline" className="shrink-0 text-xs capitalize">
+                      {r.category}
+                    </Badge>
                   </div>
                   <div className="mb-3 flex gap-2">
                     <RiskBadge label="Likelihood" level={r.likelihood} />
                     <RiskBadge label="Impact" level={r.impact} />
                   </div>
                   <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm">
-                    <span className="font-mono text-xs uppercase tracking-wider text-primary">Mitigation</span>
+                    <span className="font-mono text-xs uppercase tracking-wider text-primary">
+                      Mitigation
+                    </span>
                     <p className="mt-1 text-foreground/80">{r.mitigation}</p>
                   </div>
                 </Card>
@@ -1060,7 +1324,9 @@ function ProjectPage() {
               lines.push(`${i + 1}. ${p.title} (${p.year}) — ${url}`);
             });
             lines.push(``);
-            lines.push(`BUDGET: ~$${totalBudget.toLocaleString()} · TIMELINE: ${plan.timeline.length} weeks`);
+            lines.push(
+              `BUDGET: ~$${totalBudget.toLocaleString()} · TIMELINE: ${plan.timeline.length} weeks`,
+            );
             lines.push(``);
             lines.push(`SUCCESS METRIC: ${plan.validation.primaryMetric.name}`);
             lines.push(`Target: ${plan.validation.primaryMetric.target}`);
@@ -1103,7 +1369,9 @@ function JudgeViewOverlay({
           <div className="flex items-center gap-2">
             <Presentation className="h-4 w-4 text-primary" />
             <span className="font-display text-sm font-semibold">Judge Presentation View</span>
-            <Badge variant="outline" className="text-[10px]">Hypothesis-to-Plan Core</Badge>
+            <Badge variant="outline" className="text-[10px]">
+              Hypothesis-to-Plan Core
+            </Badge>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={onCopy}>
@@ -1119,14 +1387,18 @@ function JudgeViewOverlay({
 
       <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
         <div>
-          <Badge variant="outline" className="mb-3">{project.domain}</Badge>
+          <Badge variant="outline" className="mb-3">
+            {project.domain}
+          </Badge>
           <h1 className="font-display text-3xl font-bold leading-tight tracking-tight md:text-4xl">
             {project.title}
           </h1>
         </div>
 
         <Card className="border-primary/30 bg-primary/5 p-5">
-          <Badge className="mb-2 bg-primary/15 text-primary hover:bg-primary/20">Demo hypothesis</Badge>
+          <Badge className="mb-2 bg-primary/15 text-primary hover:bg-primary/20">
+            Demo hypothesis
+          </Badge>
           <div className="flex items-start gap-2">
             <Quote className="h-4 w-4 shrink-0 text-primary" />
             <p className="italic leading-relaxed text-foreground/85">{project.hypothesis}</p>
@@ -1170,13 +1442,20 @@ function JudgeViewOverlay({
         <Card className="border-border/60 bg-gradient-card p-5">
           <h2 className="mb-3 font-display text-xl font-semibold">Experiment plan summary</h2>
           <div className="mb-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Protocol ({plan.protocol.length} phases)</div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Protocol ({plan.protocol.length} phases)
+            </div>
             <ol className="space-y-1 text-sm">
               {plan.protocol.map((s) => (
-                <li key={s.step} className="rounded border border-border/60 bg-background/40 px-3 py-1.5">
+                <li
+                  key={s.step}
+                  className="rounded border border-border/60 bg-background/40 px-3 py-1.5"
+                >
                   <span className="font-mono text-xs text-primary">#{s.step}</span>{" "}
                   <span className="font-medium">{s.title}</span>{" "}
-                  <span className="text-xs text-muted-foreground">— {s.phase} · {s.duration}</span>
+                  <span className="text-xs text-muted-foreground">
+                    — {s.phase} · {s.duration}
+                  </span>
                 </li>
               ))}
             </ol>
@@ -1184,19 +1463,36 @@ function JudgeViewOverlay({
 
           <div className="mb-4">
             <div className="mb-2 flex items-center justify-between">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Supplies & catalog #</div>
-              <Badge variant="outline" className="text-[10px]">Verify before ordering</Badge>
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Supplies & catalog #
+              </div>
+              <Badge variant="outline" className="text-[10px]">
+                Verify before ordering
+              </Badge>
             </div>
             <ul className="space-y-1 text-sm">
               {topSupplies.map((m, i) => (
-                <li key={i} className="flex flex-wrap justify-between gap-2 rounded border border-border/60 bg-background/40 px-3 py-1.5">
-                  <span><span className="font-medium">{m.name}</span> <span className="text-xs text-muted-foreground">— {m.vendor}</span></span>
+                <li
+                  key={i}
+                  className="flex flex-wrap justify-between gap-2 rounded border border-border/60 bg-background/40 px-3 py-1.5"
+                >
+                  <span>
+                    <span className="font-medium">{m.name}</span>{" "}
+                    <span className="text-xs text-muted-foreground">— {m.vendor}</span>
+                  </span>
                   <span className="font-mono text-xs">
                     {m.verification.sourceUrl ? (
-                      <a href={m.verification.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      <a
+                        href={m.verification.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
                         {m.catalog}
                       </a>
-                    ) : m.catalog}
+                    ) : (
+                      m.catalog
+                    )}
                     {" · "}${m.total}
                   </span>
                 </li>
@@ -1204,7 +1500,9 @@ function JudgeViewOverlay({
             </ul>
             <div className="mt-2 text-right text-sm">
               <span className="text-muted-foreground">Total estimated budget: </span>
-              <span className="font-mono font-bold text-primary">${totalBudget.toLocaleString()}</span>
+              <span className="font-mono font-bold text-primary">
+                ${totalBudget.toLocaleString()}
+              </span>
             </div>
           </div>
 
@@ -1214,9 +1512,14 @@ function JudgeViewOverlay({
             </div>
             <ol className="space-y-1 text-sm">
               {plan.timeline.map((wk) => (
-                <li key={wk.week} className="rounded border border-border/60 bg-background/40 px-3 py-1.5">
+                <li
+                  key={wk.week}
+                  className="rounded border border-border/60 bg-background/40 px-3 py-1.5"
+                >
                   <span className="font-mono text-xs text-primary">W{wk.week}</span>{" "}
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{wk.phase}</span>{" "}
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {wk.phase}
+                  </span>{" "}
                   <span className="font-medium">{wk.milestone}</span>{" "}
                   <span className="text-muted-foreground">— {wk.deliverable}</span>
                 </li>
@@ -1227,34 +1530,66 @@ function JudgeViewOverlay({
           <div>
             <div className="mb-2 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-success" />
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Validation success metric</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Validation success metric
+              </div>
             </div>
             <div className="rounded-lg border border-success/30 bg-success/5 p-3 text-sm">
               <div className="font-medium">{plan.validation.primaryMetric.name}</div>
-              <div className="mt-1 text-foreground/80"><span className="font-semibold text-success">Target:</span> {plan.validation.primaryMetric.target}</div>
-              <div className="mt-1 text-muted-foreground"><span className="font-semibold">Method:</span> {plan.validation.primaryMetric.method}</div>
+              <div className="mt-1 text-foreground/80">
+                <span className="font-semibold text-success">Target:</span>{" "}
+                {plan.validation.primaryMetric.target}
+              </div>
+              <div className="mt-1 text-muted-foreground">
+                <span className="font-semibold">Method:</span>{" "}
+                {plan.validation.primaryMetric.method}
+              </div>
             </div>
           </div>
         </Card>
 
         <Card className="border-primary/30 bg-gradient-card p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-display text-xl font-semibold">Challenge 4 — Hypothesis → Literature QC → Runnable Experiment Plan</h2>
-            <Badge variant="outline" className="border-success/40 bg-success/10 text-[10px] uppercase tracking-wider text-success">
+            <h2 className="font-display text-xl font-semibold">
+              Challenge 4 — Hypothesis → Literature QC → Runnable Experiment Plan
+            </h2>
+            <Badge
+              variant="outline"
+              className="border-success/40 bg-success/10 text-[10px] uppercase tracking-wider text-success"
+            >
               Verified source-backed demo
             </Badge>
           </div>
           <ul className="grid gap-2 text-sm md:grid-cols-2">
-            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Input:</b> plain-language hypothesis</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2">
+              <b className="text-primary">Input:</b> plain-language hypothesis
+            </li>
             <li className="rounded border border-border/60 bg-background/50 p-2">
               <b className="text-primary">Literature QC:</b> novelty signal —{" "}
-              <span className="font-mono">{plan.literatureQc?.result ?? "Similar work exists"}</span>
+              <span className="font-mono">
+                {plan.literatureQc?.result ?? "Similar work exists"}
+              </span>
             </li>
-            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Protocol:</b> grounded in public protocol references (OpenWetWare / protocols.io)</li>
-            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Supplies:</b> supplier + catalog #s with verify-before-ordering notes</li>
-            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Budget & timeline:</b> ${totalBudget.toLocaleString()} · {plan.timeline.length} weeks with dependencies</li>
-            <li className="rounded border border-border/60 bg-background/50 p-2"><b className="text-primary">Validation:</b> primary metric, controls, statistical approach</li>
-            <li className="rounded border border-border/60 bg-background/50 p-2 md:col-span-2"><b className="text-primary">Lab Readiness Score + scientist feedback loop:</b> closes the corrections cycle locally</li>
+            <li className="rounded border border-border/60 bg-background/50 p-2">
+              <b className="text-primary">Protocol:</b> grounded in public protocol references
+              (OpenWetWare / protocols.io)
+            </li>
+            <li className="rounded border border-border/60 bg-background/50 p-2">
+              <b className="text-primary">Supplies:</b> supplier + catalog #s with
+              verify-before-ordering notes
+            </li>
+            <li className="rounded border border-border/60 bg-background/50 p-2">
+              <b className="text-primary">Budget & timeline:</b> ${totalBudget.toLocaleString()} ·{" "}
+              {plan.timeline.length} weeks with dependencies
+            </li>
+            <li className="rounded border border-border/60 bg-background/50 p-2">
+              <b className="text-primary">Validation:</b> primary metric, controls, statistical
+              approach
+            </li>
+            <li className="rounded border border-border/60 bg-background/50 p-2 md:col-span-2">
+              <b className="text-primary">Lab Readiness Score + scientist feedback loop:</b> closes
+              the corrections cycle locally
+            </li>
           </ul>
         </Card>
 
@@ -1287,9 +1622,14 @@ function ScoreCard({ label, value, helper }: { label: string; value: number; hel
         <div className="text-xs text-muted-foreground">/100</div>
       </div>
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-gradient-hero transition-all" style={{ width: `${value}%` }} />
+        <div
+          className="h-full rounded-full bg-gradient-hero transition-all"
+          style={{ width: `${value}%` }}
+        />
       </div>
-      {helper && <div className="mt-1.5 text-[10px] leading-tight text-muted-foreground">{helper}</div>}
+      {helper && (
+        <div className="mt-1.5 text-[10px] leading-tight text-muted-foreground">{helper}</div>
+      )}
     </div>
   );
 }
@@ -1299,7 +1639,9 @@ function StatCard({ label, value, helper }: { label: string; value: string; help
     <div className="rounded-lg border border-border/60 bg-background/50 p-4">
       <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="mt-1 font-display text-2xl font-semibold">{value}</div>
-      {helper && <div className="mt-1.5 text-[10px] leading-tight text-muted-foreground">{helper}</div>}
+      {helper && (
+        <div className="mt-1.5 text-[10px] leading-tight text-muted-foreground">{helper}</div>
+      )}
     </div>
   );
 }
@@ -1314,10 +1656,19 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle: string })
 }
 
 function TabTrig({
-  value, icon: Icon, children,
-}: { value: string; icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  value,
+  icon: Icon,
+  children,
+}: {
+  value: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
   return (
-    <TabsTrigger value={value} className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+    <TabsTrigger
+      value={value}
+      className="gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+    >
       <Icon className="h-3.5 w-3.5" />
       {children}
     </TabsTrigger>
@@ -1329,12 +1680,14 @@ function RiskBadge({ label, level }: { label: string; level: "low" | "medium" | 
     level === "high"
       ? "bg-destructive/15 text-destructive"
       : level === "medium"
-      ? "bg-warning/20 text-warning-foreground"
-      : "bg-success/15 text-success";
+        ? "bg-warning/20 text-warning-foreground"
+        : "bg-success/15 text-success";
   return (
     <div className="flex items-center gap-1.5 text-xs">
       <span className="text-muted-foreground">{label}:</span>
-      <Badge className={cls} variant="secondary">{level}</Badge>
+      <Badge className={cls} variant="secondary">
+        {level}
+      </Badge>
     </div>
   );
 }
@@ -1344,17 +1697,23 @@ function RiskLevelBadge({ level, label }: { level: "low" | "medium" | "high"; la
     level === "high"
       ? "bg-destructive/15 text-destructive"
       : level === "medium"
-      ? "bg-warning/20 text-warning-foreground"
-      : "bg-success/15 text-success";
-  return <Badge className={cls} variant="secondary">{label}: {level}</Badge>;
+        ? "bg-warning/20 text-warning-foreground"
+        : "bg-success/15 text-success";
+  return (
+    <Badge className={cls} variant="secondary">
+      {label}: {level}
+    </Badge>
+  );
 }
 
 function slugify(s: string) {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60) || "research-plan";
+  return (
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "research-plan"
+  );
 }
 
 function deriveExperimentType(project: Project): string {
@@ -1378,13 +1737,132 @@ function deriveExperimentType(project: Project): string {
   return organism || domain || project.title;
 }
 
+function formatLivePlanAsMarkdown(project: Project, livePlan: LivePlanResponse): string {
+  const L: string[] = [];
+  const hr = () => L.push("\n---\n");
+  const sourceRows = livePlan.source_status
+    ? (["literature", "protocols", "materials"] as const).map((key) => {
+        const row = livePlan.source_status![key];
+        return `- **${key}:** ${row.label} (${row.coverage ?? "unknown"}) — ${row.reason}`;
+      })
+    : [];
+
+  L.push(`# ${livePlan.project_summary.title || project.title}`);
+  L.push(`\n_Generated by Hypothesis→Plan live pipeline · ${new Date().toLocaleDateString()}_`);
+  L.push(`\n**Domain:** ${livePlan.project_summary.domain}`);
+  if (livePlan.project_summary.organism_or_system) {
+    L.push(`\n**System:** ${livePlan.project_summary.organism_or_system}`);
+  }
+  L.push(`\n## Hypothesis\n> ${livePlan.project_summary.hypothesis || project.hypothesis}`);
+
+  hr();
+  L.push(`## Source Status`);
+  if (sourceRows.length) L.push(...sourceRows);
+  L.push(`- **Fallback literature:** ${livePlan.warnings.uses_fallback_literature ? "yes" : "no"}`);
+  L.push(`- **Fallback protocols:** ${livePlan.warnings.uses_fallback_protocols ? "yes" : "no"}`);
+  L.push(
+    `- **Unverified materials:** ${livePlan.warnings.has_unverified_materials ? "yes" : "no"}`,
+  );
+  if (livePlan.feedback_context) {
+    L.push(
+      `- **Scientist feedback memory:** ${livePlan.feedback_context.applied_count} correction(s) applied for ${livePlan.feedback_context.experiment_type}`,
+    );
+  }
+
+  hr();
+  L.push(`## Literature QC`);
+  L.push(`- **Result:** ${livePlan.literature_qc.result}`);
+  L.push(`- **Reason:** ${livePlan.literature_qc.reason}`);
+  L.push(`- **Weak evidence:** ${livePlan.literature_qc.weak_evidence ? "yes" : "no"}`);
+
+  hr();
+  L.push(`## Evidence (${livePlan.evidence_map.length} sources)`);
+  livePlan.evidence_map.forEach((e, i) => {
+    L.push(`\n### ${i + 1}. ${e.title}`);
+    L.push(`- Role: ${e.role}`);
+    L.push(`- Source: ${e.source}`);
+    L.push(`- Venue/year: ${e.venue || "unknown"} · ${e.year || "unknown"}`);
+    L.push(`- Relevance: ${Math.round(e.relevance_score * 100)}%`);
+    L.push(`- URL: ${e.source_url}`);
+  });
+
+  hr();
+  L.push(`## Protocols (${livePlan.protocols.length})`);
+  livePlan.protocols.forEach((p, i) => {
+    L.push(`\n### ${i + 1}. ${p.title}`);
+    L.push(`- Source: ${p.source}`);
+    L.push(`- Authors: ${p.authors}`);
+    L.push(`- Relevance: ${Math.round(p.relevance_score * 100)}%`);
+    L.push(`- Matched keywords: ${p.matched_keywords.join(", ") || "none"}`);
+    L.push(`- URL: ${p.url}`);
+    L.push(`- Description: ${p.description}`);
+  });
+
+  hr();
+  L.push(`## Materials & Budget`);
+  L.push(
+    `- **Verified subtotal:** $${livePlan.materials_budget.subtotal_verified.toLocaleString()}`,
+  );
+  L.push(`- **Budget cap:** $${livePlan.materials_budget.budget_cap.toLocaleString()}`);
+  L.push(`- **Within budget:** ${livePlan.materials_budget.within_budget ? "yes" : "no"}`);
+  L.push(`- **Source badge:** ${livePlan.materials_budget.source_badge}`);
+  L.push(`\n| # | Item | Supplier | Catalog | Pack | Cost | Verified | Source |`);
+  L.push(`|---|------|----------|---------|------|------|----------|--------|`);
+  livePlan.materials_budget.items.forEach((m, i) => {
+    L.push(
+      `| ${i + 1} | ${m.name} | ${m.supplier} | ${m.catalog} | ${m.pack_size} | $${m.unit_cost.toLocaleString()} | ${m.verified ? "yes" : "no"} | ${m.source_url || "VERIFY_REQUIRED"} |`,
+    );
+  });
+
+  hr();
+  L.push(`## Timeline (${livePlan.timeline.length} weeks)`);
+  livePlan.timeline.forEach((wk) => {
+    L.push(`\n### Week ${wk.week} — ${wk.milestone} _(${wk.phase})_`);
+    wk.tasks.forEach((t) => L.push(`- ${t}`));
+    L.push(`_Deliverable:_ ${wk.deliverable}`);
+  });
+
+  hr();
+  L.push(`## Validation Plan`);
+  L.push(`\n**Primary metric:** ${livePlan.validation_plan.primary_metric.name}`);
+  L.push(`- Target: ${livePlan.validation_plan.primary_metric.target}`);
+  L.push(`- Method: ${livePlan.validation_plan.primary_metric.method}`);
+  L.push(`\n**Secondary metrics:**`);
+  livePlan.validation_plan.secondary_metrics.forEach((v) => {
+    L.push(`- ${v.name} — target: ${v.target}; method: ${v.method}`);
+  });
+  L.push(`\n**Statistical approach:** ${livePlan.validation_plan.statistical_approach}`);
+  L.push(`\n**Reproducibility checks:**`);
+  livePlan.validation_plan.reproducibility_checks.forEach((c) => L.push(`- ${c}`));
+  L.push(`\n**Positive control:** ${livePlan.validation_plan.positive_control}`);
+  L.push(`\n**Negative control:** ${livePlan.validation_plan.negative_control}`);
+
+  hr();
+  L.push(`## Risks & Mitigations (${livePlan.risks.length})`);
+  livePlan.risks.forEach((r) => {
+    L.push(`\n### ${r.title} _(${r.category})_`);
+    L.push(`- Likelihood: ${r.likelihood} · Impact: ${r.impact}`);
+    L.push(`- **Mitigation:** ${r.mitigation}`);
+  });
+
+  hr();
+  L.push(`## Scientist Review Questions`);
+  livePlan.scientist_review_questions.forEach((q) => L.push(`- ${q}`));
+
+  L.push(`\n---\n_End of live plan._`);
+  return L.join("\n");
+}
+
 function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget: number): string {
   const L: string[] = [];
   const hr = () => L.push("\n---\n");
 
   L.push(`# ${project.title}`);
   L.push(`\n_Generated by Hypothesis→Plan · ${new Date().toLocaleDateString()}_`);
-  L.push(`\n**Domain:** ${project.domain}` + (project.organism ? ` · **System:** ${project.organism}` : ""));
+  L.push(
+    `\n**Domain:** ${project.domain}` +
+      (project.organism ? ` · **System:** ${project.organism}` : ""),
+  );
   L.push(`\n## Hypothesis\n> ${project.hypothesis}`);
 
   if (plan.problemStatement) L.push(`\n## Problem\n${plan.problemStatement}`);
@@ -1408,12 +1886,17 @@ function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget
   hr();
   L.push(`## Evidence — related work (${plan.papers.length} papers)`);
   plan.papers.forEach((p, i) => {
-    const url = p.verification?.sourceUrl ?? (p.doi.startsWith("http") ? p.doi : `https://doi.org/${p.doi}`);
+    const url =
+      p.verification?.sourceUrl ?? (p.doi.startsWith("http") ? p.doi : `https://doi.org/${p.doi}`);
     L.push(`\n### ${i + 1}. ${p.title}`);
     L.push(`- _${p.authors} · ${p.venue} · ${p.year}_`);
-    L.push(`- Relevance: ${Math.round(p.similarity * 100)}%${p.citations > 0 ? ` · Citations: ${p.citations}` : ""}`);
+    L.push(
+      `- Relevance: ${Math.round(p.similarity * 100)}%${p.citations > 0 ? ` · Citations: ${p.citations}` : ""}`,
+    );
     L.push(`- Source: ${url}`);
-    L.push(`- **Verification:** \`${p.verification.status}\`${p.verification.note ? ` — ${p.verification.note}` : ""}`);
+    L.push(
+      `- **Verification:** \`${p.verification.status}\`${p.verification.note ? ` — ${p.verification.note}` : ""}`,
+    );
     L.push(`- **Abstract:** ${p.abstract}`);
     L.push(`- **Why it matters:** ${p.whyItMatters}`);
   });
@@ -1439,13 +1922,19 @@ function formatPlanAsMarkdown(project: Project, plan: GeneratedPlan, totalBudget
 
   hr();
   L.push(`## Materials & budget`);
-  L.push(`\n_Catalog numbers shown as \`VERIFY_REQUIRED\` must be replaced with confirmed vendor SKUs before ordering._`);
+  L.push(
+    `\n_Catalog numbers shown as \`VERIFY_REQUIRED\` must be replaced with confirmed vendor SKUs before ordering._`,
+  );
   L.push(`\n| # | Item | Purpose | Supplier | Catalog | Qty | Unit | Total | Verification |`);
   L.push(`|---|------|---------|----------|---------|-----|------|-------|--------------|`);
   plan.materials.forEach((m, i) => {
-    L.push(`| ${i + 1} | ${m.name} | ${m.purpose} | ${m.vendor} | ${m.catalog} | ${m.quantity} | $${m.unitCost.toLocaleString()} | $${m.total.toLocaleString()} | ${m.verification.status} |`);
+    L.push(
+      `| ${i + 1} | ${m.name} | ${m.purpose} | ${m.vendor} | ${m.catalog} | ${m.quantity} | $${m.unitCost.toLocaleString()} | $${m.total.toLocaleString()} | ${m.verification.status} |`,
+    );
   });
-  L.push(`\n**Grand total: $${totalBudget.toLocaleString()}**${plan.budgetSource ? ` _(budget source: ${plan.budgetSource.status})_` : ""}`);
+  L.push(
+    `\n**Grand total: $${totalBudget.toLocaleString()}**${plan.budgetSource ? ` _(budget source: ${plan.budgetSource.status})_` : ""}`,
+  );
 
   hr();
   L.push(`## Timeline (${plan.timeline.length} weeks)`);
