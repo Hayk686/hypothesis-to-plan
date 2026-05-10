@@ -26,7 +26,9 @@
 ## Возможности
 
 - **Чат.** Бот отвечает на языке пользователя (RU / HY / EN), коротко, одной репликой. Правила — в `picoclaw/AGENTS.md`.
-- **Скачивание аудио.** На запрос пользователя бот вызывает `python scripts\converter.py download --url <URL> --items <RANGE> --format <FORMAT>` (обёртка над `yt-dlp` + `ffmpeg`). Прямой запуск `yt-dlp` заблокирован в `config.local.json` (`tools.exec.custom_deny_patterns`). Файлы сохраняются в `output\media\`.
+- **Скачивание аудио.** Команда `/dl` и обычные просьбы скачать музыку обрабатываются самим PicoClaw-агентом через `python scripts\converter.py download --url <URL> [--url <URL2> ...] --items <RANGE> --format <FORMAT>`. Wrapper чистит имена треков перед отправкой. Если скачано несколько аудио, wrapper собирает их в один ZIP, потому что Telegram delivery в PicoClaw завершает ответ после первого `send_file`. Прямой запуск `yt-dlp` заблокирован в `config.local.json`; разрешён только локальный wrapper.
+- **Конвертация документов.** Загруженные `.doc` / `.docx` агент конвертирует в PDF через `scripts\convert_docx_to_pdf.ps1`; `.pdf` конвертирует в DOCX через `scripts\convert_pdf_to_docx.ps1`. Результат сохраняется в `output/documents/` и отправляется пользователю.
+- **Поиск в интернете.** PicoClaw использует встроенный `web_search`; в `config.local.json` включён DuckDuckGo и отключён приоритет нативного поиска провайдера, чтобы не получать Sogou/региональный мусор.
 
 ## Структура
 
@@ -45,9 +47,11 @@ tools/picoclaw/
 scripts/
   start_picoclaw_gateway.ps1 запуск gateway
   converter.py               скачивание / конвертация аудио (yt-dlp + ffmpeg)
+  convert_docx_to_pdf.ps1    конвертация DOC/DOCX в PDF через Microsoft Word COM
+  convert_pdf_to_docx.ps1    конвертация PDF в DOCX через Microsoft Word COM
   check.ps1                  проверка окружения
 input/                       пользовательские файлы (вход для будущих инструментов)
-output/                      создаётся при первом скачивании в output/media/
+output/                      файлы, созданные инструментами: output/media/ и output/documents/
 ```
 
 ## Дальше
