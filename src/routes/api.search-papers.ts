@@ -35,8 +35,7 @@ function jsonResponse(body: unknown, status = 200) {
 export const Route = createFileRoute("/api/search-papers")({
   server: {
     handlers: {
-      OPTIONS: async () =>
-        new Response(null, { status: 204, headers: CORS_HEADERS }),
+      OPTIONS: async () => new Response(null, { status: 204, headers: CORS_HEADERS }),
 
       POST: async ({ request }) => {
         // Server-only secret — boolean only, never returned or logged.

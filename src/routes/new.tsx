@@ -50,12 +50,113 @@ const DOMAINS = [
 
 type Phase = "form" | "qc-loading" | "qc-review" | "plan-loading";
 
+type LiveQcPaper = {
+  id: string;
+  title: string;
+  authors: string;
+  year: number;
+  venue: string;
+  abstract: string;
+  citation_count: number;
+  source_url: string;
+  doi: string | null;
+  relevance_score: number;
+  evidence_role: "primary" | "supporting" | "background";
+  source: "semantic-scholar" | "pubmed";
+};
+
+type LiveQcResponse = {
+  data?: LiveQcPaper[];
+  debug?: {
+    source?: "semantic-scholar" | "pubmed" | "merged" | "none";
+    used_fallback?: boolean;
+    primaryQuery?: string;
+  };
+};
+
+function livePaperToPlanPaper(p: LiveQcPaper) {
+  return {
+    id: p.id,
+    title: p.title,
+    authors: p.authors,
+    year: p.year,
+    venue: p.venue,
+    citations: p.citation_count,
+    similarity: p.relevance_score,
+    abstract: p.abstract,
+    whyItMatters: `${p.evidence_role} evidence returned by live ${
+      p.source === "semantic-scholar" ? "Semantic Scholar" : "PubMed"
+    } search for this hypothesis.`,
+    doi: p.source_url,
+    verification: {
+      status: "verified" as const,
+      sourceUrl: p.source_url,
+      note: `Live ${p.source === "semantic-scholar" ? "Semantic Scholar" : "PubMed"} Literature QC result.`,
+      checkedAt: new Date().toISOString().slice(0, 10),
+    },
+  };
+}
+
+async function runLiveLiteratureQc(project: Project): Promise<{
+  papers: ReturnType<typeof livePaperToPlanPaper>[];
+  literatureQc: NonNullable<GeneratedPlan["literatureQc"]>;
+  sourceLabel: string;
+}> {
+  const res = await fetch("/api/search-literature", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      hypothesis: project.hypothesis,
+      domain: project.domain,
+      organism_or_system: project.organism,
+      constraints: project.constraints,
+    }),
+  });
+  if (!res.ok) {
+    return {
+      papers: [],
+      literatureQc: {
+        result: "Live literature check unavailable",
+        reason: `Literature QC request failed with HTTP ${res.status}. No seeded HeLa references were substituted.`,
+      },
+      sourceLabel: "Live QC unavailable",
+    };
+  }
+
+  const json = (await res.json()) as LiveQcResponse;
+  const papers = (json.data ?? []).slice(0, 5).map(livePaperToPlanPaper);
+  const debug = json.debug;
+  const count = papers.length;
+  const sourceLabel =
+    debug?.source === "merged"
+      ? "Live Semantic Scholar + PubMed"
+      : debug?.source === "pubmed"
+        ? "Live PubMed"
+        : debug?.source === "semantic-scholar"
+          ? "Live Semantic Scholar"
+          : "Live literature search";
+
+  const result =
+    count === 0
+      ? "No prior work found"
+      : count <= 2 || debug?.used_fallback
+        ? "Limited similar work found"
+        : "Similar work exists";
+  const reason =
+    count === 0
+      ? `No relevant papers returned for "${debug?.primaryQuery ?? project.hypothesis.slice(0, 120)}".`
+      : `Returned ${count} live reference${count === 1 ? "" : "s"} for this exact project context via ${sourceLabel}.`;
+
+  return { papers, literatureQc: { result, reason }, sourceLabel };
+}
+
 function NewProjectPage() {
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>("form");
   const [stage, setStage] = useState(0);
   const [draftProject, setDraftProject] = useState<Project | null>(null);
   const [draftPlan, setDraftPlan] = useState<GeneratedPlan | null>(null);
+  const [qcSourceLabel, setQcSourceLabel] = useState("Live literature search");
   const [form, setForm] = useState({
     title: "",
     hypothesis: "",
@@ -109,19 +210,22 @@ function NewProjectPage() {
 
     // If the user submitted the demo hypothesis verbatim, route through the
     // verified DEMO_PROJECT so Literature QC + plan are the verified ones.
-    const looksLikeDemo =
-      form.hypothesis.trim().toLowerCase() ===
-      DEMO_PROJECT.hypothesis.trim().toLowerCase();
-    const effectiveProject: Project = looksLikeDemo ? DEMO_PROJECT : project;
+    const effectiveProject: Project = project;
 
     // Simulated literature QC latency (no network call — stays demo-stable).
-    await new Promise((r) => setTimeout(r, 900));
-
-    const plan = generatePlan(effectiveProject);
-    setDraftProject(effectiveProject.id === DEMO_PROJECT.id ? project : project);
+    const qc = await runLiveLiteratureQc(project);
+    const plan = {
+      ...generatePlan(effectiveProject),
+      papers: qc.papers,
+      literatureQc: qc.literatureQc,
+      evidenceConfidence: qc.papers.length >= 3 ? 82 : qc.papers.length > 0 ? 55 : 25,
+      noveltyScore: qc.papers.length >= 3 ? 45 : qc.papers.length > 0 ? 68 : 86,
+    };
+    setDraftProject(project);
     // We always persist as the user-created project (so it appears under their
     // projects), but reuse the verified plan content when it's the demo hypothesis.
     setDraftPlan(plan);
+    setQcSourceLabel(qc.sourceLabel);
     setPhase("qc-review");
   }
 
@@ -235,11 +339,16 @@ function NewProjectPage() {
                     onChange={(e) => update("domain", e.target.value)}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    {DOMAINS.map((d) => <option key={d}>{d}</option>)}
+                    {DOMAINS.map((d) => (
+                      <option key={d}>{d}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Timeline: <span className="font-mono text-primary">{form.timelineWeeks} weeks</span></Label>
+                  <Label>
+                    Timeline:{" "}
+                    <span className="font-mono text-primary">{form.timelineWeeks} weeks</span>
+                  </Label>
                   <Slider
                     value={[form.timelineWeeks]}
                     min={4}
@@ -261,7 +370,10 @@ function NewProjectPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Budget: <span className="font-mono text-primary">${form.budget.toLocaleString()}</span></Label>
+                <Label>
+                  Budget:{" "}
+                  <span className="font-mono text-primary">${form.budget.toLocaleString()}</span>
+                </Label>
                 <Slider
                   value={[form.budget]}
                   min={5000}
@@ -270,7 +382,8 @@ function NewProjectPage() {
                   onValueChange={([v]) => update("budget", v)}
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>$5k</span><span>$500k</span>
+                  <span>$5k</span>
+                  <span>$500k</span>
                 </div>
               </div>
 
@@ -316,7 +429,8 @@ function NewProjectPage() {
               Checking published literature…
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              Querying the verified source-backed corpus for prior work, similar studies, and exact matches.
+              Querying live Semantic Scholar/PubMed for prior work, similar studies, and exact
+              matches.
             </p>
           </Card>
         )}
@@ -342,64 +456,79 @@ function NewProjectPage() {
                   variant="outline"
                   className="border-success/40 bg-success/10 text-[10px] uppercase tracking-wider text-success"
                 >
-                  Verified source-backed demo
+                  {qcSourceLabel}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  Live Semantic Scholar refresh available on the project page after you proceed.
+                  This check is live; seeded HeLa references are not substituted for other
+                  hypotheses.
                 </span>
               </div>
             </Card>
 
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <h3 className="font-display text-base font-semibold">
-                  Top references ({Math.min(3, draftPlan.papers.length)})
-                </h3>
-                <span className="text-xs text-muted-foreground">Why each matters → reviewed before plan generation</span>
-              </div>
-              <div className="space-y-3">
-                {draftPlan.papers.slice(0, 3).map((p) => {
-                  const url =
-                    p.verification?.sourceUrl ??
-                    (p.doi.startsWith("http") ? p.doi : `https://doi.org/${p.doi}`);
-                  return (
-                    <Card key={p.id} className="border-border/60 bg-card p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-display text-sm font-semibold leading-snug">
-                            {p.title}
-                          </h4>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {p.authors} · <span className="italic">{p.venue}</span> · {p.year}
+            {draftPlan.papers.length > 0 ? (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="font-display text-base font-semibold">
+                    Top references ({Math.min(3, draftPlan.papers.length)})
+                  </h3>
+                  <span className="text-xs text-muted-foreground">
+                    Why each matters → reviewed before plan generation
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {draftPlan.papers.slice(0, 3).map((p) => {
+                    const url =
+                      p.verification?.sourceUrl ??
+                      (p.doi.startsWith("http") ? p.doi : `https://doi.org/${p.doi}`);
+                    return (
+                      <Card key={p.id} className="border-border/60 bg-card p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-display text-sm font-semibold leading-snug">
+                              {p.title}
+                            </h4>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {p.authors} · <span className="italic">{p.venue}</span> · {p.year}
+                            </div>
+                            <div className="mt-2 rounded-md border-l-2 border-primary/60 bg-primary/5 p-2 text-xs text-foreground/85">
+                              <span className="font-mono uppercase tracking-wider text-primary">
+                                Why it matters:
+                              </span>{" "}
+                              {p.whyItMatters}
+                            </div>
                           </div>
-                          <div className="mt-2 rounded-md border-l-2 border-primary/60 bg-primary/5 p-2 text-xs text-foreground/85">
-                            <span className="font-mono uppercase tracking-wider text-primary">
-                              Why it matters:
-                            </span>{" "}
-                            {p.whyItMatters}
-                          </div>
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex shrink-0 items-center text-xs text-primary hover:underline"
+                          >
+                            Open source <ExternalLink className="ml-1 h-3 w-3" />
+                          </a>
                         </div>
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex shrink-0 items-center text-xs text-primary hover:underline"
-                        >
-                          Open source <ExternalLink className="ml-1 h-3 w-3" />
-                        </a>
-                      </div>
-                    </Card>
-                  );
-                })}
+                      </Card>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            ) : (
+              <Card className="border-border/60 bg-card p-4">
+                <div className="font-display text-sm font-semibold">
+                  No live references returned
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  You can still proceed, but the plan should be treated as weak-evidence until a
+                  scientist verifies related work manually.
+                </p>
+              </Card>
+            )}
 
             <Card className="border-success/30 bg-success/5 p-4">
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                 <p className="text-sm text-foreground/85">
-                  Literature QC complete. You can now generate the full experiment plan —
-                  protocol, materials, budget, timeline, validation, and risks.
+                  Literature QC complete. You can now generate the full experiment plan — protocol,
+                  materials, budget, timeline, validation, and risks.
                 </p>
               </div>
             </Card>

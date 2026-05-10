@@ -24,6 +24,13 @@ import {
   type NormalizedMaterial,
   type ResolveDebug,
 } from "@/lib/materials.server";
+import {
+  runLlmOrchestrator,
+  type LlmDebug,
+  type LlmPlan,
+  type LlmProjectInput,
+} from "@/lib/llm.server";
+import type { LlmFeedbackCorrection, ScientistFeedbackSection } from "@/lib/scientistFeedback";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -45,7 +52,17 @@ type ProjectInput = {
   resources?: string;
   method_keywords?: string | string[];
   required_materials?: string[];
+  experiment_type?: string;
+  scientist_feedback?: unknown;
 };
+
+const FEEDBACK_SECTIONS: ScientistFeedbackSection[] = [
+  "Protocol",
+  "Supplies",
+  "Budget",
+  "Timeline",
+  "Validation",
+];
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -61,27 +78,83 @@ function safeNum(v: unknown, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
+function normalizeScientistFeedback(v: unknown): LlmFeedbackCorrection[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((row, idx): LlmFeedbackCorrection | null => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      const section = typeof r.section === "string" ? r.section : "";
+      if (!FEEDBACK_SECTIONS.includes(section as ScientistFeedbackSection)) return null;
+      const correctedValue = safeStr(r.corrected_value ?? r.correctedValue);
+      const rationale = safeStr(r.rationale ?? r.reason);
+      if (!correctedValue && !rationale) return null;
+      return {
+        id: safeStr(r.id, `feedback-${idx + 1}`),
+        experiment_type: safeStr(r.experiment_type ?? r.experimentType, "similar experiment"),
+        section: section as ScientistFeedbackSection,
+        rating: Math.max(1, Math.min(5, safeNum(r.rating, 4))),
+        original_suggestion: safeStr(r.original_suggestion ?? r.originalSuggestion),
+        corrected_value: correctedValue,
+        rationale,
+        created_at: safeStr(r.created_at ?? r.createdAt, new Date().toISOString()),
+      };
+    })
+    .filter((row): row is LlmFeedbackCorrection => row !== null)
+    .slice(0, 6);
+}
+
 function buildTimeline(weeks: number) {
   const target = Math.max(4, Math.min(16, Math.round(weeks)));
   const phases = [
-    { phase: "Planning", milestone: "Project locked",
-      tasks: ["Pre-register hypothesis and primary endpoint", "Place reagent orders", "Confirm equipment availability"],
-      deliverable: "Pre-registration + reagent orders" },
-    { phase: "Cell prep", milestone: "Cells expanded",
+    {
+      phase: "Planning",
+      milestone: "Project locked",
+      tasks: [
+        "Pre-register hypothesis and primary endpoint",
+        "Place reagent orders",
+        "Confirm equipment availability",
+      ],
+      deliverable: "Pre-registration + reagent orders",
+    },
+    {
+      phase: "Cell prep",
+      milestone: "Cells expanded",
       tasks: ["Thaw working stock", "Expand to target confluence", "Mycoplasma test"],
-      deliverable: "Healthy cell stock" },
-    { phase: "Intervention", milestone: "Treatment applied",
-      tasks: ["Prepare media / treatment arms", "Apply intervention", "Capture intermediate readouts"],
-      deliverable: "Treated samples ready for measurement" },
-    { phase: "Storage / hold", milestone: "Hold complete",
+      deliverable: "Healthy cell stock",
+    },
+    {
+      phase: "Intervention",
+      milestone: "Treatment applied",
+      tasks: [
+        "Prepare media / treatment arms",
+        "Apply intervention",
+        "Capture intermediate readouts",
+      ],
+      deliverable: "Treated samples ready for measurement",
+    },
+    {
+      phase: "Storage / hold",
+      milestone: "Hold complete",
       tasks: ["Maintain hold conditions", "Pre-warm media", "Blind sample labels"],
-      deliverable: "Hold complete, counter blinded" },
-    { phase: "Measurement", milestone: "Primary readout",
+      deliverable: "Hold complete, counter blinded",
+    },
+    {
+      phase: "Measurement",
+      milestone: "Primary readout",
       tasks: ["Collect primary readout", "Collect secondary readouts", "Photograph plates"],
-      deliverable: "Raw data for primary endpoint" },
-    { phase: "Analysis", milestone: "Report drafted",
-      tasks: ["Compute summary statistics", "Test pre-registered threshold", "Write methods + results"],
-      deliverable: "Locked report + figures" },
+      deliverable: "Raw data for primary endpoint",
+    },
+    {
+      phase: "Analysis",
+      milestone: "Report drafted",
+      tasks: [
+        "Compute summary statistics",
+        "Test pre-registered threshold",
+        "Write methods + results",
+      ],
+      deliverable: "Locked report + figures",
+    },
   ];
   return Array.from({ length: target }, (_, i) => {
     const src = phases[Math.min(phases.length - 1, Math.floor((i / target) * phases.length))];
@@ -91,18 +164,40 @@ function buildTimeline(weeks: number) {
 
 function defaultRisks() {
   return [
-    { id: "r1", title: "Effect size smaller than expected", category: "scientific",
-      likelihood: "medium", impact: "medium",
-      mitigation: "Pre-register the threshold and the analysis; pre-power n with conservative assumptions." },
-    { id: "r2", title: "Operator / counter bias", category: "scientific",
-      likelihood: "medium", impact: "medium",
-      mitigation: "Blind labels; have a second operator re-count a random subset (≥25%)." },
-    { id: "r3", title: "Reagent backorder delays the experiment", category: "operational",
-      likelihood: "low", impact: "medium",
-      mitigation: "Order reagents in week 1 and identify a second supplier per critical SKU." },
-    { id: "r4", title: "Budget overrun on consumables", category: "budget",
-      likelihood: "medium", impact: "low",
-      mitigation: "Confirm current vendor prices in week 1; drop one biological replicate before skipping controls." },
+    {
+      id: "r1",
+      title: "Effect size smaller than expected",
+      category: "scientific",
+      likelihood: "medium",
+      impact: "medium",
+      mitigation:
+        "Pre-register the threshold and the analysis; pre-power n with conservative assumptions.",
+    },
+    {
+      id: "r2",
+      title: "Operator / counter bias",
+      category: "scientific",
+      likelihood: "medium",
+      impact: "medium",
+      mitigation: "Blind labels; have a second operator re-count a random subset (≥25%).",
+    },
+    {
+      id: "r3",
+      title: "Reagent backorder delays the experiment",
+      category: "operational",
+      likelihood: "low",
+      impact: "medium",
+      mitigation: "Order reagents in week 1 and identify a second supplier per critical SKU.",
+    },
+    {
+      id: "r4",
+      title: "Budget overrun on consumables",
+      category: "budget",
+      likelihood: "medium",
+      impact: "low",
+      mitigation:
+        "Confirm current vendor prices in week 1; drop one biological replicate before skipping controls.",
+    },
   ];
 }
 
@@ -129,27 +224,60 @@ export const Route = createFileRoute("/api/generate-plan")({
         const constraints = safeStr(project.constraints, "");
         const budget = safeNum(project.budget, 5000);
         const weeks = safeNum(project.timelineWeeks, 6);
+        const scientistFeedback = normalizeScientistFeedback(project.scientist_feedback);
+        const experimentType = safeStr(project.experiment_type, `${organism || domain}`);
 
-        // Run literature, protocols, materials in parallel — IN-PROCESS.
-        const [lit, proto, mat] = await Promise.all([
+        const project_summary = {
+          title: safeStr(project.title, "Untitled experiment"),
+          hypothesis,
+          domain,
+          organism_or_system: organism,
+          budget_cap: budget,
+          timeline_weeks: weeks,
+          constraints,
+          source:
+            project.id === "demo-trehalose-hela-001" ? "Seeded verified demo" : "Live generation",
+        };
+
+        const llmProject: LlmProjectInput = project_summary;
+
+        // Run source discovery in parallel — IN-PROCESS. The LLM orchestrator
+        // consumes these source-backed results in the next step.
+        const [lit, proto] = await Promise.all([
           runLiteratureSearch({ hypothesis, domain, organism_or_system: organism, constraints }),
           runProtocolsSearch({
             hypothesis,
             organism_or_system: organism,
             method_keywords: project.method_keywords,
           }),
-          Promise.resolve(
-            runMaterialsResolver({
-              organism_or_system: organism,
-              assay_type: domain,
-              required_materials: project.required_materials,
-              protocol_steps: [],
-            }),
-          ),
         ]);
 
         const papers: NormalizedPaper[] = lit.data;
         const protocols: NormalizedProtocol[] = proto.data;
+        const llm = await runLlmOrchestrator({
+          project: llmProject,
+          papers,
+          protocols,
+          feedback: scientistFeedback,
+        });
+        const llmPlan: LlmPlan | null = llm.plan;
+        const llmDebug: LlmDebug = llm.debug;
+
+        const llmRequiredMaterials = llmPlan?.experimental_strategy.required_materials ?? [];
+        const explicitRequiredMaterials = Array.isArray(project.required_materials)
+          ? project.required_materials.filter((m): m is string => typeof m === "string")
+          : [];
+        const required_materials =
+          explicitRequiredMaterials.length > 0 ? explicitRequiredMaterials : llmRequiredMaterials;
+        const mat = runMaterialsResolver({
+          organism_or_system: organism,
+          assay_type: domain,
+          required_materials,
+          protocol_steps: protocols.map((p) => ({
+            description: `${p.title}. ${p.description}`,
+            equipment: llmPlan?.experimental_strategy.required_materials ?? [],
+          })),
+        });
         const materials: NormalizedMaterial[] = mat.data;
 
         const litDebug: LiteratureDebug = lit.debug;
@@ -161,6 +289,7 @@ export const Route = createFileRoute("/api/generate-plan")({
           literature: litDebug.used_fallback || papers.length === 0,
           protocols: protoDebug.used_fallback,
           materials: matDebug.used_fallback,
+          llm: llmDebug.used_fallback,
         };
 
         // ----- Materials budget -----
@@ -193,7 +322,14 @@ export const Route = createFileRoute("/api/generate-plan")({
         // Weights: literature 25 / protocols 25 / materials 30 / budget 20.
         // Penalties: protocols fallback, missing catalog, missing/generic source URL.
         const litLive = !usedFallback.literature;
-        const literatureScore = litLive && papers.length >= 3 ? 25 : papers.length >= 2 ? 18 : papers.length >= 1 ? 10 : 0;
+        const literatureScore =
+          litLive && papers.length >= 3
+            ? 25
+            : papers.length >= 2
+              ? 18
+              : papers.length >= 1
+                ? 10
+                : 0;
 
         const protocolsLive = protocols.length > 0 && !usedFallback.protocols;
         const protocolsScore = protocolsLive ? 25 : protocols.length > 0 ? 12 : 0; // partial when curated fallback
@@ -209,7 +345,9 @@ export const Route = createFileRoute("/api/generate-plan")({
               if (!m.catalog || m.catalog === "VERIFY_REQUIRED") item -= perItem * 0.5;
               const url = m.source_url ?? "";
               const hasSpecificUrl =
-                /sigmaaldrich\.com|thermofisher\.com|fishersci\.com|gibco|milliporesigma|neb\.com|bio-rad|abcam/i.test(url);
+                /sigmaaldrich\.com|thermofisher\.com|fishersci\.com|gibco|milliporesigma|neb\.com|bio-rad|abcam/i.test(
+                  url,
+                );
               if (!url) item -= perItem * 0.4;
               else if (!hasSpecificUrl) item -= perItem * 0.2; // generic vendor
             }
@@ -222,7 +360,6 @@ export const Route = createFileRoute("/api/generate-plan")({
         const lab_readiness_score = Math.round(
           literatureScore + protocolsScore + materialsScore + budgetScore,
         );
-
 
         // ----- Literature QC -----
         const literature_qc = {
@@ -250,14 +387,18 @@ export const Route = createFileRoute("/api/generate-plan")({
           venue: p.venue,
         }));
 
-        const validation_plan = {
+        const fallback_validation_plan = {
           primary_metric: {
             name: "Pre-registered primary endpoint derived from the hypothesis",
             target: "Defined effect size with one-sided test at α = 0.05",
             method: "Direct measurement of the dependent variable in the hypothesis",
           },
           secondary_metrics: [
-            { name: "Time-course readouts", target: "Trend consistent with primary", method: "Same assay at later time points" },
+            {
+              name: "Time-course readouts",
+              target: "Trend consistent with primary",
+              method: "Same assay at later time points",
+            },
           ],
           statistical_approach:
             "Pre-registered Welch's t-test with α = 0.05, n powered to detect the stated effect size; report point estimate and 95% CI.",
@@ -269,36 +410,70 @@ export const Route = createFileRoute("/api/generate-plan")({
           positive_control: "Untreated / non-perturbed sample from the same batch",
           negative_control: "Vehicle-only or assay-floor condition",
         };
+        const validation_plan = llmPlan?.validation_plan ?? fallback_validation_plan;
 
-        const scientist_review_questions = [
+        const fallback_scientist_review_questions = [
           "Is the pre-registered effect size realistic given the published baselines?",
           "Are the verified catalog numbers still in stock at the assumed prices?",
           "Does the primary protocol need adaptation for this organism / assay?",
           "Are the proposed controls sufficient to rule out the top two confounders?",
         ];
+        let scientist_review_questions = llmPlan?.scientist_review_questions.length
+          ? llmPlan.scientist_review_questions
+          : fallback_scientist_review_questions;
 
-        const project_summary = {
-          title: safeStr(project.title, "Untitled experiment"),
-          hypothesis,
-          domain,
-          organism_or_system: organism,
-          budget_cap: budget,
-          timeline_weeks: weeks,
-          constraints,
-          source: project.id === "demo-trehalose-hela-001" ? "Seeded verified demo" : "Live generation",
-        };
+        const timeline = llmPlan?.timeline.length ? llmPlan.timeline : buildTimeline(weeks);
+        if (scientistFeedback.length > 0) {
+          const feedbackQuestions = scientistFeedback.map(
+            (f) => `Prior scientist correction (${f.section}): ${f.corrected_value}`,
+          );
+          scientist_review_questions = [...feedbackQuestions, ...scientist_review_questions].slice(
+            0,
+            10,
+          );
+
+          for (const f of scientistFeedback) {
+            if (f.section === "Validation") {
+              validation_plan.secondary_metrics.unshift({
+                name: "Scientist-corrected validation readout",
+                target: f.corrected_value,
+                method: f.rationale || "Apply prior expert correction for similar experiments.",
+              });
+              validation_plan.reproducibility_checks.unshift(
+                `Apply prior scientist validation correction: ${f.corrected_value}`,
+              );
+            }
+            if ((f.section === "Protocol" || f.section === "Timeline") && timeline[0]) {
+              timeline[0].tasks = [
+                `Apply prior scientist ${f.section.toLowerCase()} correction: ${f.corrected_value}`,
+                ...timeline[0].tasks,
+              ].slice(0, 6);
+            }
+          }
+        }
+        const risks = llmPlan?.risks.length ? llmPlan.risks : defaultRisks();
         const judge_presentation_view = {
-          headline: project_summary.title,
-          one_line_pitch: hypothesis.length > 220 ? `${hypothesis.slice(0, 217)}…` : hypothesis,
+          headline: llmPlan?.judge_presentation_view.headline ?? project_summary.title,
+          one_line_pitch:
+            llmPlan?.judge_presentation_view.one_line_pitch ??
+            (hypothesis.length > 220 ? `${hypothesis.slice(0, 217)}…` : hypothesis),
+          evidence_strength:
+            llmPlan?.judge_presentation_view.evidence_strength ??
+            (evidenceWeak ? "weak" : "adequate"),
+          protocol_strategy:
+            llmPlan?.judge_presentation_view.protocol_strategy ??
+            "Adapt matched protocols under scientist review.",
           key_evidence: papers.slice(0, 3).map((p) => ({
-            title: p.title, year: p.year, source_url: p.source_url, role: p.evidence_role,
+            title: p.title,
+            year: p.year,
+            source_url: p.source_url,
+            role: p.evidence_role,
           })),
           primary_protocol: protocols[0]
             ? { title: protocols[0].title, url: protocols[0].url, source: protocols[0].source }
             : null,
           lab_readiness_score,
           materials_within_budget: materials_budget.within_budget,
-          evidence_strength: evidenceWeak ? "weak" : "adequate",
         };
 
         // ----- Per-source status (for the UI panel) -----
@@ -324,9 +499,10 @@ export const Route = createFileRoute("/api/generate-plan")({
               : `${protocols.length} protocols from protocols.io.`,
           },
           materials: {
-            label: matDebug.unmatchedCount > 0
-              ? "Verified registry (partial)"
-              : "Verified supplier registry",
+            label:
+              matDebug.unmatchedCount > 0
+                ? "Verified registry (partial)"
+                : "Verified supplier registry",
             ok: matDebug.matchedCount > 0 && matDebug.unmatchedCount === 0,
             coverage:
               matDebug.matchedCount === 0
@@ -336,14 +512,25 @@ export const Route = createFileRoute("/api/generate-plan")({
                   : "full",
             reason: `${matDebug.matchedCount} matched / ${matDebug.unmatchedCount} unverified (registry size ${matDebug.registrySize}).`,
           },
+          llm: {
+            label: llmDebug.used_fallback
+              ? "Deterministic fallback"
+              : `${llmDebug.provider}: ${llmDebug.model}`,
+            ok: !llmDebug.used_fallback,
+            coverage: llmDebug.used_fallback ? "fallback" : "full",
+            reason: llmDebug.used_fallback
+              ? (llmDebug.error ?? "LLM provider unavailable.")
+              : "Structured plan generated by the configured LLM provider.",
+          },
         };
-
 
         const debug = {
           orchestrator: { evidenceWeak, usedFallback },
           literature: litDebug,
           protocols: protoDebug,
           materials: matDebug,
+          llm: llmDebug,
+          feedback: { experimentType, appliedCount: scientistFeedback.length },
         };
 
         return jsonResponse({
@@ -362,17 +549,23 @@ export const Route = createFileRoute("/api/generate-plan")({
           })),
           materials_budget,
           lab_readiness_score,
-          timeline: buildTimeline(weeks),
+          timeline,
           validation_plan,
-          risks: defaultRisks(),
+          risks,
           scientist_review_questions,
           judge_presentation_view,
+          feedback_context: {
+            experiment_type: experimentType,
+            applied_count: scientistFeedback.length,
+            corrections: scientistFeedback,
+          },
           source_status,
           warnings: {
             evidence_weak: evidenceWeak,
             uses_fallback_literature: usedFallback.literature,
             uses_fallback_protocols: usedFallback.protocols,
             has_unverified_materials: usedFallback.materials,
+            uses_fallback_llm: usedFallback.llm,
           },
           debug,
         });

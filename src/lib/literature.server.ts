@@ -61,8 +61,8 @@ export type LiteratureDebug = {
   hasPubMedKey: boolean;
   primaryQuery: string;
   attempts: LiteratureAttempt[];
-  semanticScholarStatus: number;   // last s2 status (back-compat)
-  pubmedStatus: number;             // last pm status (back-compat)
+  semanticScholarStatus: number; // last s2 status (back-compat)
+  pubmedStatus: number; // last pm status (back-compat)
   resultCount: number;
   source: "semantic-scholar" | "pubmed" | "merged" | "none";
   used_fallback: boolean;
@@ -77,17 +77,67 @@ export type LiteratureResult = {
 // ---------- query building ----------
 
 const STOPWORDS = new Set([
-  "the","a","an","of","to","in","on","for","with","and","or","but","is","are",
-  "be","by","at","as","that","this","it","from","into","than","then","will",
-  "can","may","using","use","used","via","over","between","across","more",
-  "less","such","these","those","we","our","their","its","if","not","no",
-  "compared","versus","vs","least","percentage","points","standard","protocol",
+  "the",
+  "a",
+  "an",
+  "of",
+  "to",
+  "in",
+  "on",
+  "for",
+  "with",
+  "and",
+  "or",
+  "but",
+  "is",
+  "are",
+  "be",
+  "by",
+  "at",
+  "as",
+  "that",
+  "this",
+  "it",
+  "from",
+  "into",
+  "than",
+  "then",
+  "will",
+  "can",
+  "may",
+  "using",
+  "use",
+  "used",
+  "via",
+  "over",
+  "between",
+  "across",
+  "more",
+  "less",
+  "such",
+  "these",
+  "those",
+  "we",
+  "our",
+  "their",
+  "its",
+  "if",
+  "not",
+  "no",
+  "compared",
+  "versus",
+  "vs",
+  "least",
+  "percentage",
+  "points",
+  "standard",
+  "protocol",
 ]);
 
 function tokens(text: string): string[] {
   return text
     .toLowerCase()
-    .replace(/[^a-z0-9\s\-]/g, " ")
+    .replace(/[^a-z0-9\s-]/g, " ")
     .split(/\s+/)
     .filter((t) => t.length > 2 && !STOPWORDS.has(t));
 }
@@ -98,8 +148,7 @@ function buildPrimaryQuery(input: LiteratureInput): string {
   }
   const hypothesis = typeof input.hypothesis === "string" ? input.hypothesis : "";
   const domain = typeof input.domain === "string" ? input.domain : "";
-  const organism =
-    typeof input.organism_or_system === "string" ? input.organism_or_system : "";
+  const organism = typeof input.organism_or_system === "string" ? input.organism_or_system : "";
 
   const seen = new Set<string>();
   const out: string[] = [];

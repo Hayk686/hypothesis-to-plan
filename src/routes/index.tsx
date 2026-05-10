@@ -34,12 +34,36 @@ export const Route = createFileRoute("/")({
 });
 
 const features = [
-  { icon: Sparkles, title: "Novelty Score", desc: "Quantify how original your hypothesis is against the published corpus." },
-  { icon: FileSearch, title: "Evidence Map", desc: "Surface the most relevant papers and identify the precise research gap." },
-  { icon: Beaker, title: "Experimental Protocol", desc: "Step-by-step procedures grounded in established methods." },
-  { icon: Calendar, title: "Week-by-Week Timeline", desc: "Realistic milestones, deliverables, and dependencies." },
-  { icon: ShieldAlert, title: "Risk Analysis", desc: "Surface technical, biological, and logistical risks with mitigations." },
-  { icon: CheckCircle2, title: "Validation Plan", desc: "Pre-defined pass criteria and statistical readouts." },
+  {
+    icon: Sparkles,
+    title: "Novelty Score",
+    desc: "Quantify how original your hypothesis is against the published corpus.",
+  },
+  {
+    icon: FileSearch,
+    title: "Evidence Map",
+    desc: "Surface the most relevant papers and identify the precise research gap.",
+  },
+  {
+    icon: Beaker,
+    title: "Experimental Protocol",
+    desc: "Step-by-step procedures grounded in established methods.",
+  },
+  {
+    icon: Calendar,
+    title: "Week-by-Week Timeline",
+    desc: "Realistic milestones, deliverables, and dependencies.",
+  },
+  {
+    icon: ShieldAlert,
+    title: "Risk Analysis",
+    desc: "Surface technical, biological, and logistical risks with mitigations.",
+  },
+  {
+    icon: CheckCircle2,
+    title: "Validation Plan",
+    desc: "Pre-defined pass criteria and statistical readouts.",
+  },
 ];
 
 function LandingPage() {
@@ -52,13 +76,16 @@ function LandingPage() {
         <div className="absolute inset-0 grid-pattern opacity-40" />
         <div className="absolute left-1/2 top-0 h-[500px] w-[800px] -translate-x-1/2 rounded-full bg-gradient-hero opacity-20 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-6 pt-20 pb-24 text-center">
-          <Badge variant="secondary" className="mb-6 border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">
+          <Badge
+            variant="secondary"
+            className="mb-6 border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary"
+          >
             <Zap className="mr-1.5 h-3 w-3" />
             Verified source-backed demo · API-ready literature QC
           </Badge>
           <h1 className="mx-auto max-w-4xl text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl">
-            From hypothesis to{" "}
-            <span className="text-gradient">experimental plan</span> in 60 seconds.
+            From hypothesis to <span className="text-gradient">experimental plan</span> in 60
+            seconds.
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
             An AI co-scientist that reads the literature, scores your novelty, and drafts a full
@@ -94,17 +121,31 @@ function LandingPage() {
               </div>
               <div className="grid gap-4 p-6 text-left md:grid-cols-4">
                 <div className="rounded-lg border border-border/60 bg-background/50 p-4">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Novelty</div>
-                  <div className="mt-1 font-display text-3xl font-semibold text-primary">74<span className="text-base text-muted-foreground">/100</span></div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Novelty
+                  </div>
+                  <div className="mt-1 font-display text-3xl font-semibold text-primary">
+                    74<span className="text-base text-muted-foreground">/100</span>
+                  </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-gradient-hero" style={{ width: "74%" }} />
+                    <div
+                      className="h-full rounded-full bg-gradient-hero"
+                      style={{ width: "74%" }}
+                    />
                   </div>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-background/50 p-4">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Feasibility</div>
-                  <div className="mt-1 font-display text-3xl font-semibold text-primary">82<span className="text-base text-muted-foreground">/100</span></div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Feasibility
+                  </div>
+                  <div className="mt-1 font-display text-3xl font-semibold text-primary">
+                    82<span className="text-base text-muted-foreground">/100</span>
+                  </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-gradient-hero" style={{ width: "82%" }} />
+                    <div
+                      className="h-full rounded-full bg-gradient-hero"
+                      style={{ width: "82%" }}
+                    />
                   </div>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-background/50 p-4">
@@ -113,7 +154,9 @@ function LandingPage() {
                   <div className="mt-2 text-xs text-muted-foreground">17 line items</div>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-background/50 p-4">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Duration</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Duration
+                  </div>
                   <div className="mt-1 font-display text-3xl font-semibold">8 wks</div>
                   <div className="mt-2 text-xs text-muted-foreground">6 protocol phases</div>
                 </div>
@@ -126,17 +169,23 @@ function LandingPage() {
       {/* FEATURES */}
       <section className="mx-auto max-w-7xl px-6 py-24">
         <div className="mb-12 text-center">
-          <Badge variant="outline" className="mb-4">What you get</Badge>
+          <Badge variant="outline" className="mb-4">
+            What you get
+          </Badge>
           <h2 className="text-4xl font-bold tracking-tight md:text-5xl">
             Everything a PI would ask for.
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-            Seven analyses, one hypothesis. Built to look credible to a domain expert on the first read.
+            Seven analyses, one hypothesis. Built to look credible to a domain expert on the first
+            read.
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {features.map((f) => (
-            <Card key={f.title} className="group border-border/60 bg-gradient-card p-6 transition-smooth hover:border-primary/40 hover:shadow-elegant">
+            <Card
+              key={f.title}
+              className="group border-border/60 bg-gradient-card p-6 transition-smooth hover:border-primary/40 hover:shadow-elegant"
+            >
               <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary transition-smooth group-hover:bg-primary group-hover:text-primary-foreground">
                 <f.icon className="h-5 w-5" />
               </div>
@@ -151,12 +200,15 @@ function LandingPage() {
       <section className="border-t border-border/60 bg-background">
         <div className="mx-auto max-w-7xl px-6 py-24">
           <div className="mb-12 text-center">
-            <Badge variant="outline" className="mb-4 border-primary/30 text-primary">Differentiators</Badge>
+            <Badge variant="outline" className="mb-4 border-primary/30 text-primary">
+              Differentiators
+            </Badge>
             <h2 className="text-4xl font-bold tracking-tight md:text-5xl">
               Why this is more than a generic AI planner.
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-              Four design choices that make the output trustworthy at the bench, not just convincing on screen.
+              Four design choices that make the output trustworthy at the bench, not just convincing
+              on screen.
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -201,7 +253,9 @@ function LandingPage() {
         <div className="mx-auto max-w-7xl px-6 py-24">
           <div className="grid gap-12 md:grid-cols-2 md:items-center">
             <div>
-              <Badge variant="outline" className="mb-4">How it works</Badge>
+              <Badge variant="outline" className="mb-4">
+                How it works
+              </Badge>
               <h2 className="text-4xl font-bold tracking-tight">
                 Three inputs. One complete plan.
               </h2>
@@ -258,7 +312,8 @@ function LandingPage() {
       </section>
 
       <footer className="border-t border-border/60 py-8 text-center text-xs text-muted-foreground">
-        Hypothesis→Plan · Seeded with verified public sources for demo reliability · Optional live Semantic Scholar refresh.
+        Hypothesis→Plan · Seeded with verified public sources for demo reliability · Optional live
+        Semantic Scholar refresh.
       </footer>
     </div>
   );

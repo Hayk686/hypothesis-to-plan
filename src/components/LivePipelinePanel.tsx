@@ -15,15 +15,17 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Sparkles, FileSearch, Beaker, ShoppingCart, Loader2,
-  CheckCircle2, AlertTriangle, ServerCog,
+  Sparkles,
+  FileSearch,
+  Beaker,
+  ShoppingCart,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  ServerCog,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  generatePlanLive,
-  type GeneratePlanStage,
-  type LivePlanResponse,
-} from "@/lib/services";
+import { generatePlanLive, type GeneratePlanStage, type LivePlanResponse } from "@/lib/services";
 import type { Project } from "@/lib/mockData";
 
 type Props = {
@@ -89,7 +91,22 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
             description: "Catalog numbers or supplier URLs missing.",
           });
         }
-        if (!w.uses_fallback_literature && !w.uses_fallback_protocols && !w.has_unverified_materials) {
+        if (w.uses_fallback_llm) {
+          toast.message("LLM orchestration fallback", {
+            description: "Set OPENROUTER_API_KEY or NVIDIA_API_KEY for generated plans.",
+          });
+        }
+        if ((res.data.feedback_context?.applied_count ?? 0) > 0) {
+          toast.success("Scientist feedback applied", {
+            description: `${res.data.feedback_context!.applied_count} prior correction(s) used as LLM context.`,
+          });
+        }
+        if (
+          !w.uses_fallback_literature &&
+          !w.uses_fallback_protocols &&
+          !w.has_unverified_materials &&
+          !w.uses_fallback_llm
+        ) {
           toast.success("Live pipeline complete", {
             description: "All sections backed by live or verified sources.",
           });
@@ -105,7 +122,11 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
 
   const w = livePlan?.warnings;
   const showWarning =
-    w && (w.uses_fallback_literature || w.uses_fallback_protocols || w.has_unverified_materials);
+    w &&
+    (w.uses_fallback_literature ||
+      w.uses_fallback_protocols ||
+      w.has_unverified_materials ||
+      w.uses_fallback_llm);
 
   return (
     <Card className="mb-6 border-border/60 bg-gradient-card p-4">
@@ -115,7 +136,10 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
             <ServerCog className="h-4 w-4 text-primary" />
             <h3 className="font-display text-sm font-semibold">Real-data pipeline</h3>
             {livePlan ? (
-              <Badge variant="outline" className="border-success/40 bg-success/10 text-[10px] uppercase tracking-wider text-success">
+              <Badge
+                variant="outline"
+                className="border-success/40 bg-success/10 text-[10px] uppercase tracking-wider text-success"
+              >
                 Live data merged
               </Badge>
             ) : (
@@ -125,20 +149,14 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            Calls{" "}
-            <code className="font-mono text-foreground/80">/api/generate-plan</code>{" "}
-            (Semantic Scholar → protocols.io → verified supplier registry). The
-            seeded plan stays available as a labeled fallback.
+            Calls <code className="font-mono text-foreground/80">/api/generate-plan</code> (Semantic
+            Scholar → protocols.io → verified supplier registry). The seeded plan stays available as
+            a labeled fallback.
           </p>
         </div>
         <div className="flex items-center gap-2">
           {livePlan && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onResult(null)}
-              disabled={running}
-            >
+            <Button variant="ghost" size="sm" onClick={() => onResult(null)} disabled={running}>
               Revert to seeded
             </Button>
           )}
@@ -164,8 +182,7 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
           {STAGE_ORDER.map((s) => {
             const idx = STAGE_ORDER.indexOf(s);
             const currentIdx = STAGE_ORDER.indexOf(stage as GeneratePlanStage);
-            const state =
-              idx < currentIdx ? "done" : idx === currentIdx ? "active" : "pending";
+            const state = idx < currentIdx ? "done" : idx === currentIdx ? "active" : "pending";
             const Icon =
               s === "searching-literature"
                 ? FileSearch
@@ -201,15 +218,22 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
 
       {/* Per-source status rows */}
       {livePlan?.source_status && (
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          {(["literature", "protocols", "materials"] as const).map((k) => {
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {(["literature", "protocols", "materials", "llm"] as const).map((k) => {
             const row = livePlan.source_status![k];
+            if (!row) return null;
             const tone = row.ok
               ? "border-success/40 bg-success/5 text-success"
               : "border-warning/40 bg-warning/10 text-warning-foreground";
             const Icon = row.ok ? CheckCircle2 : AlertTriangle;
             const label =
-              k === "literature" ? "Literature" : k === "protocols" ? "Protocols" : "Materials";
+              k === "literature"
+                ? "Literature"
+                : k === "protocols"
+                  ? "Protocols"
+                  : k === "materials"
+                    ? "Materials"
+                    : "LLM";
             return (
               <div
                 key={k}
@@ -229,6 +253,23 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
         </div>
       )}
 
+      {livePlan?.feedback_context && livePlan.feedback_context.applied_count > 0 && (
+        <div className="mt-4 rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <div className="font-semibold text-primary">Scientist feedback memory applied</div>
+            <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+              {livePlan.feedback_context.experiment_type}
+            </Badge>
+          </div>
+          <div className="text-foreground/80">
+            {livePlan.feedback_context.applied_count} prior structured correction
+            {livePlan.feedback_context.applied_count === 1 ? "" : "s"} were sent to the LLM as
+            expert context for this similar plan.
+          </div>
+        </div>
+      )}
+
       {/* Global fallback warning banner */}
       {showWarning && (
         <div className="mt-4 flex flex-wrap items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
@@ -240,7 +281,9 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
             <div className="mt-0.5 text-foreground/80">
               {w!.uses_fallback_literature && "Literature uses curated fallback. "}
               {w!.uses_fallback_protocols && "Protocols use curated fallback. "}
-              {w!.has_unverified_materials && "Some materials are not in the verified supplier registry. "}
+              {w!.has_unverified_materials &&
+                "Some materials are not in the verified supplier registry. "}
+              {w!.uses_fallback_llm && "LLM orchestration used deterministic fallback. "}
               See per-source rows above for the exact reason.
             </div>
           </div>
@@ -274,23 +317,38 @@ export function SourceBadge({
   source,
   fallback,
 }: {
-  source: "live-semantic-scholar" | "pubmed" | "protocols.io" | "verified-supplier" | "curated-fallback" | "seed";
+  source:
+    | "live-semantic-scholar"
+    | "pubmed"
+    | "protocols.io"
+    | "verified-supplier"
+    | "curated-fallback"
+    | "seed";
   fallback?: boolean;
 }) {
   const map = {
-    "live-semantic-scholar": { label: "Live Semantic Scholar", cls: "border-success/40 bg-success/10 text-success" },
-    "pubmed": { label: "PubMed", cls: "border-primary/40 bg-primary/10 text-primary" },
+    "live-semantic-scholar": {
+      label: "Live Semantic Scholar",
+      cls: "border-success/40 bg-success/10 text-success",
+    },
+    pubmed: { label: "PubMed", cls: "border-primary/40 bg-primary/10 text-primary" },
     "protocols.io": { label: "protocols.io", cls: "border-success/40 bg-success/10 text-success" },
-    "verified-supplier": { label: "Verified supplier source", cls: "border-success/40 bg-success/10 text-success" },
-    "curated-fallback": { label: "Curated fallback", cls: "border-warning/40 bg-warning/10 text-warning-foreground" },
-    "seed": { label: "Seeded verified demo", cls: "border-border/60 bg-muted/40 text-muted-foreground" },
+    "verified-supplier": {
+      label: "Verified supplier source",
+      cls: "border-success/40 bg-success/10 text-success",
+    },
+    "curated-fallback": {
+      label: "Curated fallback",
+      cls: "border-warning/40 bg-warning/10 text-warning-foreground",
+    },
+    seed: {
+      label: "Seeded verified demo",
+      cls: "border-border/60 bg-muted/40 text-muted-foreground",
+    },
   } as const;
   const entry = map[source];
   return (
-    <Badge
-      variant="outline"
-      className={`text-[10px] uppercase tracking-wider ${entry.cls}`}
-    >
+    <Badge variant="outline" className={`text-[10px] uppercase tracking-wider ${entry.cls}`}>
       {entry.label}
       {fallback ? " · fallback" : ""}
     </Badge>

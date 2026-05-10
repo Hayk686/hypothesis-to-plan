@@ -10,8 +10,8 @@
 //       /paper/search, /paper/{id}, /paper/{id}/references,
 //       /paper/{id}/citations
 //   - protocols.io      (protocol matching)
-//   - Anthropic API     (LLM-structured experiment-plan output
-//                        via JSON schema / tool calling)
+//   - OpenRouter / NVIDIA NIM
+//                      (LLM-structured experiment-plan output)
 //   - FastAPI backend   (literature QC + plan generation)
 //   - Supabase Postgres (plan storage in JSONB,
 //                        pgvector/Chroma for feedback memory)
@@ -29,6 +29,12 @@ import {
   type Project,
   type ProtocolStep,
 } from "@/lib/mockData";
+import {
+  deriveExperimentType,
+  selectRelevantScientistFeedback,
+  toLlmFeedbackCorrections,
+  type LlmFeedbackCorrection,
+} from "@/lib/scientistFeedback";
 
 /** Where the data is currently coming from. Surfaced in the UI. */
 export type DataSource = "seed" | "live-api" | "fallback";
@@ -94,9 +100,7 @@ function s2ToPaper(p: S2Paper, idx: number): Paper {
           .filter(Boolean)
           .join(", ") + (p.authors.length > 4 ? ", et al." : "")
       : "Unknown authors";
-  const url =
-    p.url ??
-    (p.externalIds?.DOI ? `https://doi.org/${p.externalIds.DOI}` : "");
+  const url = p.url ?? (p.externalIds?.DOI ? `https://doi.org/${p.externalIds.DOI}` : "");
   return {
     id: p.paperId ?? `s2-${idx}`,
     title: p.title ?? "Untitled",
@@ -118,9 +122,7 @@ function s2ToPaper(p: S2Paper, idx: number): Paper {
   };
 }
 
-export async function searchLiterature(
-  query: string,
-): Promise<ServiceResult<Paper[]>> {
+export async function searchLiterature(query: string): Promise<ServiceResult<Paper[]>> {
   const trimmed = query.trim();
   if (!trimmed) {
     return {
@@ -235,9 +237,7 @@ export async function getPaperDetails(
  * Live wiring (future):
  *   GET https://www.protocols.io/api/v3/protocols?filter=public&key=<query>
  */
-export async function matchProtocols(
-  hypothesis: string,
-): Promise<ServiceResult<ProtocolStep[]>> {
+export async function matchProtocols(hypothesis: string): Promise<ServiceResult<ProtocolStep[]>> {
   void hypothesis;
   return delay({
     data: DEMO_PLAN.protocol,
@@ -428,22 +428,50 @@ export type LivePlanResponse = {
   }>;
   scientist_review_questions: string[];
   judge_presentation_view: unknown;
+  feedback_context?: {
+    experiment_type: string;
+    applied_count: number;
+    corrections: LlmFeedbackCorrection[];
+  };
   source_status?: {
-    literature: { label: string; ok: boolean; coverage?: "full" | "partial" | "fallback"; reason: string };
-    protocols: { label: string; ok: boolean; coverage?: "full" | "partial" | "fallback"; reason: string };
-    materials: { label: string; ok: boolean; coverage?: "full" | "partial" | "fallback"; reason: string };
+    literature: {
+      label: string;
+      ok: boolean;
+      coverage?: "full" | "partial" | "fallback";
+      reason: string;
+    };
+    protocols: {
+      label: string;
+      ok: boolean;
+      coverage?: "full" | "partial" | "fallback";
+      reason: string;
+    };
+    materials: {
+      label: string;
+      ok: boolean;
+      coverage?: "full" | "partial" | "fallback";
+      reason: string;
+    };
+    llm?: {
+      label: string;
+      ok: boolean;
+      coverage?: "full" | "partial" | "fallback";
+      reason: string;
+    };
   };
   warnings: {
     evidence_weak: boolean;
     uses_fallback_literature: boolean;
     uses_fallback_protocols: boolean;
     has_unverified_materials: boolean;
+    uses_fallback_llm?: boolean;
   };
   debug: {
     orchestrator: { evidenceWeak: boolean; usedFallback: Record<string, boolean> };
     literature: unknown;
     protocols: unknown;
     materials: unknown;
+    llm?: unknown;
   };
 };
 
@@ -485,8 +513,12 @@ export async function generatePlanLive(
   tick("generating-plan");
 
   try {
+    const experimentType = deriveExperimentType(project);
+    const feedbackCorrections = toLlmFeedbackCorrections(
+      selectRelevantScientistFeedback(project, 6),
+    );
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
     const res = await fetch("/api/generate-plan", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -500,6 +532,8 @@ export async function generatePlanLive(
           budget: project.budget,
           timelineWeeks: project.timelineWeeks,
           constraints: project.constraints,
+          experiment_type: experimentType,
+          scientist_feedback: feedbackCorrections,
         },
       }),
       signal: controller.signal,
@@ -531,9 +565,7 @@ export const TECH_STACK = {
     "Lucide icons",
     "Framer Motion-ready UI",
   ],
-  backendPlanned: [
-    "Python FastAPI service for literature QC and experiment-plan generation",
-  ],
+  backendPlanned: ["Python FastAPI service for literature QC and experiment-plan generation"],
   apisPlanned: [
     {
       name: "Semantic Scholar",
@@ -552,17 +584,14 @@ export const TECH_STACK = {
     },
   ],
   llmLayerPlanned: [
-    "Direct Anthropic API calls",
-    "JSON schema / tool calling for structured experiment-plan output",
+    "OpenRouter or NVIDIA NIM via OpenAI-compatible chat completions",
+    "JSON-only orchestration for structured experiment-plan output",
   ],
   databasePlanned: [
     "Supabase Postgres + JSONB for experiment plans",
     "pgvector or Chroma for scientist feedback memory",
   ],
-  hostingPlanned: [
-    "Vercel for the frontend",
-    "Railway or Render for the FastAPI backend",
-  ],
+  hostingPlanned: ["Vercel for the frontend", "Railway or Render for the FastAPI backend"],
   demoNote:
-    "This demo uses verified public-source seed data with optional Semantic Scholar refresh. Real APIs can replace the service layer (src/lib/services.ts) without changing the UI.",
+    "The live pipeline calls Semantic Scholar, protocols.io, a verified supplier registry, and an optional OpenRouter/NVIDIA LLM orchestrator. Missing keys are surfaced as labeled fallbacks instead of silent failures.",
 } as const;

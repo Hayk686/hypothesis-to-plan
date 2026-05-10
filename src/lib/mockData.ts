@@ -67,7 +67,13 @@ export type Paper = {
 
 export type ProtocolStep = {
   step: number;
-  phase: "Preparation" | "Sample setup" | "Intervention" | "Measurement" | "Controls" | "Expected outputs";
+  phase:
+    | "Preparation"
+    | "Sample setup"
+    | "Intervention"
+    | "Measurement"
+    | "Controls"
+    | "Expected outputs";
   title: string;
   description: string;
   duration: string;
@@ -205,8 +211,10 @@ export const DEMO_PROJECT: Project = {
   organism: "HeLa (human cervical adenocarcinoma cell line)",
   budget: 4200,
   timelineWeeks: 6,
-  resources: "BSL-2 tissue culture room, biosafety cabinet, CO₂ incubator, -80 °C freezer, liquid N₂ dewar, hemocytometer, inverted microscope",
-  constraints: "No animal work; no patient samples; budget capped at $4.5k; 6-week deadline for hackathon deliverable",
+  resources:
+    "BSL-2 tissue culture room, biosafety cabinet, CO₂ incubator, -80 °C freezer, liquid N₂ dewar, hemocytometer, inverted microscope",
+  constraints:
+    "No animal work; no patient samples; budget capped at $4.5k; 6-week deadline for hackathon deliverable",
   createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
   noveltyScore: 58,
   status: "complete",
@@ -245,7 +253,8 @@ export const DEMO_PLAN: GeneratedPlan = {
   papers: [
     {
       id: "p1",
-      title: "Cryoprotective enhancing effect of very low concentration of trehalose on the functions of primary rat hepatocytes",
+      title:
+        "Cryoprotective enhancing effect of very low concentration of trehalose on the functions of primary rat hepatocytes",
       authors: "Katenz E, Vondran FWR, Schwartlander R, et al.",
       year: 2007,
       venue: "ScienceDirect (Cryobiology / hepatology archive)",
@@ -263,7 +272,8 @@ export const DEMO_PLAN: GeneratedPlan = {
     },
     {
       id: "p2",
-      title: "Comparative efficacy of dimethyl sulfoxide, glycerol and methanol on the post-thaw cell viability of HeLa cells",
+      title:
+        "Comparative efficacy of dimethyl sulfoxide, glycerol and methanol on the post-thaw cell viability of HeLa cells",
       authors: "Van Veterinary Journal authors (see source page for full list)",
       year: 2023,
       venue: "Van Veterinary Journal (DergiPark)",
@@ -306,7 +316,16 @@ export const DEMO_PLAN: GeneratedPlan = {
       description:
         "Maintain HeLa cells in DMEM (low glucose, with sodium pyruvate) + 10% FBS + 1× antibiotics at 37 °C / 5% CO₂. Expand to 80–90% confluence in T75 flasks. Prepare three freezing media on ice: (A) Standard DMSO control: 90% complete medium + 10% DMSO. (B) Trehalose arm: complete medium + 0.2 M trehalose + 5% DMSO. (C) Sucrose arm (legacy comparator): complete medium + 0.2 M sucrose + 5% DMSO.",
       duration: "Week 1–2",
-      equipment: ["Biosafety cabinet", "CO₂ incubator", "T75 flasks", "DMEM low glucose", "FBS", "DMSO", "D-(+)-Trehalose dihydrate", "Sucrose"],
+      equipment: [
+        "Biosafety cabinet",
+        "CO₂ incubator",
+        "T75 flasks",
+        "DMEM low glucose",
+        "FBS",
+        "DMSO",
+        "D-(+)-Trehalose dihydrate",
+        "Sucrose",
+      ],
       protocolSource: mkVerified(
         "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
         "Primary protocol source — OpenWetWare mammalian cell freeze-down/thaw workflow.",
@@ -319,7 +338,14 @@ export const DEMO_PLAN: GeneratedPlan = {
       description:
         "Wash cells with PBS, dissociate with Trypsin-EDTA 0.25%, neutralise with complete medium, centrifuge 200 × g for 5 min. Resuspend in PBS and count viable cells with trypan blue 0.4% on a hemocytometer. Re-pellet and resuspend in each freezing medium at 1 × 10⁶ cells/mL. Aliquot 1 mL per cryovial; n = 6 vials per arm.",
       duration: "Week 2",
-      equipment: ["PBS", "Trypsin-EDTA 0.25%", "Trypan Blue 0.4%", "Hemocytometer", "Cryovials", "Centrifuge"],
+      equipment: [
+        "PBS",
+        "Trypsin-EDTA 0.25%",
+        "Trypan Blue 0.4%",
+        "Hemocytometer",
+        "Cryovials",
+        "Centrifuge",
+      ],
       protocolSource: mkVerified(
         "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
         "Primary protocol source — OpenWetWare mammalian cell freeze-down/thaw workflow.",
@@ -345,7 +371,13 @@ export const DEMO_PLAN: GeneratedPlan = {
       description:
         "Thaw each vial rapidly in a 37 °C water bath (~60–90 s, until a small ice nub remains). Transfer to 9 mL pre-warmed complete medium, centrifuge 200 × g for 5 min, resuspend in 1 mL medium. Count with trypan blue 0.4% on a hemocytometer at t = 0 h. Plate the rest into 6-well plates and re-count viability at 24 h and 72 h post-plating.",
       duration: "Week 4",
-      equipment: ["37 °C water bath", "Hemocytometer", "Trypan Blue 0.4%", "6-well plates", "Inverted microscope"],
+      equipment: [
+        "37 °C water bath",
+        "Hemocytometer",
+        "Trypan Blue 0.4%",
+        "6-well plates",
+        "Inverted microscope",
+      ],
       protocolSource: mkSupporting(
         "https://www.protocols.io/view/cryopreservation-of-labyrinthulomycetes-in-treh-vctw6pw",
         "Trehalose-containing cryopreservation workflow — supporting source only; not a HeLa-specific protocol.",
@@ -525,24 +557,97 @@ export const DEMO_PLAN: GeneratedPlan = {
     },
   ],
   timeline: [
-    { week: 1, phase: "Planning",        milestone: "Project locked",            tasks: ["Pre-register hypothesis and ≥15 pp threshold on OSF", "Order trehalose, DMSO, FBS, trypan blue", "Confirm HeLa stock available or order vial"], deliverable: "OSF entry + reagent order placed" },
-    { week: 2, phase: "Cell prep",       milestone: "Cells expanded",            tasks: ["Thaw working HeLa stock", "Expand to 80–90% confluence in T75", "Mycoplasma test"],                                                               deliverable: "Healthy HeLa stock at passage ≤ +5" },
-    { week: 3, phase: "Freezing",        milestone: "All arms frozen",           tasks: ["Prepare DMSO / trehalose / sucrose / PBS freezing media", "Harvest, count, aliquot 6 vials per arm", "Freeze at -80 °C, transfer to LN₂"],            deliverable: "24 cryovials in LN₂ vapour phase" },
-    { week: 4, phase: "Storage",         milestone: "Storage hold",              tasks: ["Hold ≥7 days in LN₂ to mimic real storage", "Pre-warm media and prep counting station", "Blind sample labels for the counter"],                       deliverable: "Storage period complete, counter blinded" },
-    { week: 5, phase: "Thaw + measure",  milestone: "Primary readout collected", tasks: ["Thaw all vials, count viability at t = 0 h", "Plate into 6-well, re-count at 24 h", "Re-count at 72 h"],                                            deliverable: "Raw viability counts at 0 / 24 / 72 h" },
-    { week: 6, phase: "Analysis",        milestone: "Report drafted",            tasks: ["Compute mean ± SD per arm and per time point", "Test ≥15 pp threshold (trehalose vs DMSO at t = 0 h)", "Write short methods + results, deposit on OSF"], deliverable: "Locked OSF report + figures" },
+    {
+      week: 1,
+      phase: "Planning",
+      milestone: "Project locked",
+      tasks: [
+        "Pre-register hypothesis and ≥15 pp threshold on OSF",
+        "Order trehalose, DMSO, FBS, trypan blue",
+        "Confirm HeLa stock available or order vial",
+      ],
+      deliverable: "OSF entry + reagent order placed",
+    },
+    {
+      week: 2,
+      phase: "Cell prep",
+      milestone: "Cells expanded",
+      tasks: ["Thaw working HeLa stock", "Expand to 80–90% confluence in T75", "Mycoplasma test"],
+      deliverable: "Healthy HeLa stock at passage ≤ +5",
+    },
+    {
+      week: 3,
+      phase: "Freezing",
+      milestone: "All arms frozen",
+      tasks: [
+        "Prepare DMSO / trehalose / sucrose / PBS freezing media",
+        "Harvest, count, aliquot 6 vials per arm",
+        "Freeze at -80 °C, transfer to LN₂",
+      ],
+      deliverable: "24 cryovials in LN₂ vapour phase",
+    },
+    {
+      week: 4,
+      phase: "Storage",
+      milestone: "Storage hold",
+      tasks: [
+        "Hold ≥7 days in LN₂ to mimic real storage",
+        "Pre-warm media and prep counting station",
+        "Blind sample labels for the counter",
+      ],
+      deliverable: "Storage period complete, counter blinded",
+    },
+    {
+      week: 5,
+      phase: "Thaw + measure",
+      milestone: "Primary readout collected",
+      tasks: [
+        "Thaw all vials, count viability at t = 0 h",
+        "Plate into 6-well, re-count at 24 h",
+        "Re-count at 72 h",
+      ],
+      deliverable: "Raw viability counts at 0 / 24 / 72 h",
+    },
+    {
+      week: 6,
+      phase: "Analysis",
+      milestone: "Report drafted",
+      tasks: [
+        "Compute mean ± SD per arm and per time point",
+        "Test ≥15 pp threshold (trehalose vs DMSO at t = 0 h)",
+        "Write short methods + results, deposit on OSF",
+      ],
+      deliverable: "Locked OSF report + figures",
+    },
   ],
   validation: {
     primaryMetric: {
       name: "Post-thaw viability difference: trehalose arm − DMSO arm at t = 0 h",
       target: "≥15 percentage points (pre-registered, n = 6 vials per arm)",
-      method: "Trypan blue 0.4% exclusion on hemocytometer; counter blinded to arm; two technical counts per vial averaged.",
+      method:
+        "Trypan blue 0.4% exclusion on hemocytometer; counter blinded to arm; two technical counts per vial averaged.",
     },
     secondaryMetrics: [
-      { name: "Viability at 24 h post-plating", target: "Trehalose ≥ DMSO within 5 pp", method: "Trypan blue count from 6-well plate detachment" },
-      { name: "Viability at 72 h post-plating", target: "Trehalose ≥ DMSO within 5 pp", method: "Trypan blue count from 6-well plate detachment" },
-      { name: "Visual confluence at day 3",     target: "Comparable across surviving arms", method: "Inverted microscope, 4× and 10× fields, scored blinded" },
-      { name: "Negative-control viability (PBS-only)", target: "<20%", method: "Sanity check that the assay can detect cryo-damage" },
+      {
+        name: "Viability at 24 h post-plating",
+        target: "Trehalose ≥ DMSO within 5 pp",
+        method: "Trypan blue count from 6-well plate detachment",
+      },
+      {
+        name: "Viability at 72 h post-plating",
+        target: "Trehalose ≥ DMSO within 5 pp",
+        method: "Trypan blue count from 6-well plate detachment",
+      },
+      {
+        name: "Visual confluence at day 3",
+        target: "Comparable across surviving arms",
+        method: "Inverted microscope, 4× and 10× fields, scored blinded",
+      },
+      {
+        name: "Negative-control viability (PBS-only)",
+        target: "<20%",
+        method: "Sanity check that the assay can detect cryo-damage",
+      },
     ],
     statisticalApproach:
       "Pre-registered one-sided Welch's t-test (trehalose > DMSO) at t = 0 h with α = 0.05; success requires the point estimate of the difference to meet the ≥15 pp threshold and the lower 95% CI bound to exclude 0. Secondary time points reported with two-way ANOVA (arm × time) and Tukey HSD; raw counts and analysis script published on OSF.",
@@ -552,8 +657,10 @@ export const DEMO_PLAN: GeneratedPlan = {
       "Raw count sheets and the analysis script (R or Python) deposited on OSF alongside the report.",
       "Repeat the freeze with one independent batch of HeLa if budget allows (week 7 stretch goal).",
     ],
-    positiveControl: "Non-frozen aliquot from the same harvest, counted at the same time points — defines maximum achievable viability for that batch.",
-    negativeControl: "PBS-only freezing medium (no cryoprotectant) — defines the floor and confirms the assay can detect cryo-damage.",
+    positiveControl:
+      "Non-frozen aliquot from the same harvest, counted at the same time points — defines maximum achievable viability for that batch.",
+    negativeControl:
+      "PBS-only freezing medium (no cryoprotectant) — defines the floor and confirms the assay can detect cryo-damage.",
     source: {
       status: "pending",
       note: "MIQE guidelines apply only if qPCR is added; this protocol uses trypan blue counting, not qPCR. If a qPCR validation arm is added, cite the MIQE guidelines.",
@@ -561,13 +668,69 @@ export const DEMO_PLAN: GeneratedPlan = {
     },
   },
   risks: [
-    { id: "r1", title: "Trehalose poorly enters HeLa cells, limiting protective effect",                        category: "scientific",     likelihood: "medium", impact: "high",   mitigation: "Use trehalose in combination with 5% DMSO (rather than alone) so the test arm still has some intracellular cryoprotection; cite the RSC review on permeability limits in the discussion." },
-    { id: "r2", title: "Counter bias inflates viability differences between arms",                              category: "scientific",     likelihood: "medium", impact: "medium", mitigation: "Blind the counter to arm identity by re-labelling vials; have a second operator re-count a random 25% of vials." },
-    { id: "r3", title: "HeLa batch variability dominates the cryoprotectant effect",                           category: "scientific",     likelihood: "medium", impact: "medium", mitigation: "Run all arms from a single harvest on the same day; if budget allows, repeat with one independent harvest as a stretch confirmation." },
-    { id: "r4", title: "Reagent backorder delays the freeze week",                                              category: "operational",    likelihood: "low",    impact: "medium", mitigation: "Order trehalose, FBS, and trypan blue in week 1; identify a second supplier for each; keep the schedule flexible by ±1 week." },
-    { id: "r5", title: "Mycoplasma contamination invalidates viability counts",                                category: "operational",    likelihood: "low",    impact: "high",   mitigation: "Mycoplasma-test the working HeLa stock in week 2 before freezing; discard and rethaw a clean stock if positive." },
-    { id: "r6", title: "Total cost overruns the $4.2k budget (esp. FBS or HeLa vial pricing changes)",         category: "budget",         likelihood: "medium", impact: "low",    mitigation: "Confirm current Sigma / Thermo prices in week 1 (catalog numbers carry verify-before-ordering notes); if FBS pricing has risen, drop one biological replicate vial per arm rather than skip controls." },
-    { id: "r7", title: "Donor-cell-line consent or BSL-2 paperwork incomplete before week 3",                  category: "ethical/safety", likelihood: "low",    impact: "medium", mitigation: "HeLa is a standard BSL-2 line; confirm institutional biosafety registration covers it before ordering, and keep the SDS on file for DMSO and trehalose handling." },
+    {
+      id: "r1",
+      title: "Trehalose poorly enters HeLa cells, limiting protective effect",
+      category: "scientific",
+      likelihood: "medium",
+      impact: "high",
+      mitigation:
+        "Use trehalose in combination with 5% DMSO (rather than alone) so the test arm still has some intracellular cryoprotection; cite the RSC review on permeability limits in the discussion.",
+    },
+    {
+      id: "r2",
+      title: "Counter bias inflates viability differences between arms",
+      category: "scientific",
+      likelihood: "medium",
+      impact: "medium",
+      mitigation:
+        "Blind the counter to arm identity by re-labelling vials; have a second operator re-count a random 25% of vials.",
+    },
+    {
+      id: "r3",
+      title: "HeLa batch variability dominates the cryoprotectant effect",
+      category: "scientific",
+      likelihood: "medium",
+      impact: "medium",
+      mitigation:
+        "Run all arms from a single harvest on the same day; if budget allows, repeat with one independent harvest as a stretch confirmation.",
+    },
+    {
+      id: "r4",
+      title: "Reagent backorder delays the freeze week",
+      category: "operational",
+      likelihood: "low",
+      impact: "medium",
+      mitigation:
+        "Order trehalose, FBS, and trypan blue in week 1; identify a second supplier for each; keep the schedule flexible by ±1 week.",
+    },
+    {
+      id: "r5",
+      title: "Mycoplasma contamination invalidates viability counts",
+      category: "operational",
+      likelihood: "low",
+      impact: "high",
+      mitigation:
+        "Mycoplasma-test the working HeLa stock in week 2 before freezing; discard and rethaw a clean stock if positive.",
+    },
+    {
+      id: "r6",
+      title: "Total cost overruns the $4.2k budget (esp. FBS or HeLa vial pricing changes)",
+      category: "budget",
+      likelihood: "medium",
+      impact: "low",
+      mitigation:
+        "Confirm current Sigma / Thermo prices in week 1 (catalog numbers carry verify-before-ordering notes); if FBS pricing has risen, drop one biological replicate vial per arm rather than skip controls.",
+    },
+    {
+      id: "r7",
+      title: "Donor-cell-line consent or BSL-2 paperwork incomplete before week 3",
+      category: "ethical/safety",
+      likelihood: "low",
+      impact: "medium",
+      mitigation:
+        "HeLa is a standard BSL-2 line; confirm institutional biosafety registration covers it before ordering, and keep the SDS on file for DMSO and trehalose handling.",
+    },
   ],
   problemStatement:
     "DMSO is the standard cryoprotectant for HeLa and most adherent cell lines, but DMSO is cytotoxic at 37 °C and complicates downstream assays. Trehalose is a non-toxic disaccharide with a documented cryoprotective effect in primary cells. Whether trehalose can match or beat DMSO for HeLa post-thaw viability has not been cleanly tested with a pre-registered effect size.",

@@ -57,17 +57,67 @@ export type ProtocolDebug = {
 export type ProtocolResult = { data: NormalizedProtocol[]; debug: ProtocolDebug };
 
 const STOPWORDS = new Set([
-  "the","a","an","of","to","in","on","for","with","and","or","but","is","are",
-  "be","by","at","as","that","this","it","from","into","than","then","will",
-  "can","may","using","use","used","via","over","between","across","more",
-  "less","such","these","those","we","our","their","its","if","not","no",
-  "compared","versus","vs","least","percentage","points","standard","protocol",
+  "the",
+  "a",
+  "an",
+  "of",
+  "to",
+  "in",
+  "on",
+  "for",
+  "with",
+  "and",
+  "or",
+  "but",
+  "is",
+  "are",
+  "be",
+  "by",
+  "at",
+  "as",
+  "that",
+  "this",
+  "it",
+  "from",
+  "into",
+  "than",
+  "then",
+  "will",
+  "can",
+  "may",
+  "using",
+  "use",
+  "used",
+  "via",
+  "over",
+  "between",
+  "across",
+  "more",
+  "less",
+  "such",
+  "these",
+  "those",
+  "we",
+  "our",
+  "their",
+  "its",
+  "if",
+  "not",
+  "no",
+  "compared",
+  "versus",
+  "vs",
+  "least",
+  "percentage",
+  "points",
+  "standard",
+  "protocol",
 ]);
 
 function tokens(text: string): string[] {
   return text
     .toLowerCase()
-    .replace(/[^a-z0-9\s\-]/g, " ")
+    .replace(/[^a-z0-9\s-]/g, " ")
     .split(/\s+/)
     .filter((t) => t.length > 2 && !STOPWORDS.has(t));
 }
@@ -103,7 +153,12 @@ function buildPrimaryQuery(input: ProtocolsInput): string {
 }
 
 function buildQueryVariants(input: ProtocolsInput, primary: string): string[] {
-  const text = `${typeof input.hypothesis === "string" ? input.hypothesis : ""} ${
+  const keywordText = Array.isArray(input.method_keywords)
+    ? input.method_keywords.filter((k): k is string => typeof k === "string").join(" ")
+    : typeof input.method_keywords === "string"
+      ? input.method_keywords
+      : "";
+  const text = `${keywordText} ${typeof input.hypothesis === "string" ? input.hypothesis : ""} ${
     typeof input.organism_or_system === "string" ? input.organism_or_system : ""
   }`.toLowerCase();
   const candidates: { match: RegExp; q: string }[] = [
@@ -124,6 +179,13 @@ function buildQueryVariants(input: ProtocolsInput, primary: string): string[] {
   }
   if (variants.length === 0) {
     variants.push("cell culture", "cell viability assay");
+  }
+  for (const q of ["cell viability assay", "cell culture"]) {
+    const normalized = q.toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      variants.push(q);
+    }
   }
   return variants;
 }
@@ -201,7 +263,7 @@ async function fetchProtocolsIo(
 ): Promise<{ status: number; protocols: NormalizedProtocol[]; error: string | null }> {
   const url = `${PROTOCOLS_IO_ENDPOINT}?filter=public&key=${encodeURIComponent(
     query,
-  )}&order_field=relevance&order_dir=desc&page_size=8`;
+  )}&page_size=8&page_id=1`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 9000);
   try {

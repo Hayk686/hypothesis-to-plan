@@ -20,12 +20,7 @@ import {
   Beaker,
   ClipboardList,
 } from "lucide-react";
-import {
-  getProject,
-  generatePlan,
-  type Project,
-  type GeneratedPlan,
-} from "@/lib/mockData";
+import { getProject, generatePlan, type Project, type GeneratedPlan } from "@/lib/mockData";
 import { TechStackPanel } from "@/components/TechStackPanel";
 
 export const Route = createFileRoute("/project/$id/present")({
@@ -64,15 +59,9 @@ function PresentPage() {
     [plan],
   );
 
-  const topPapers = useMemo(
-    () => (plan ? plan.papers.slice(0, 3) : []),
-    [plan],
-  );
+  const topPapers = useMemo(() => (plan ? plan.papers.slice(0, 3) : []), [plan]);
 
-  const topSupplies = useMemo(
-    () => (plan ? plan.materials.slice(0, 5) : []),
-    [plan],
-  );
+  const topSupplies = useMemo(() => (plan ? plan.materials.slice(0, 5) : []), [plan]);
 
   function handleCopyPitch() {
     if (!project || !plan) return;
@@ -131,9 +120,7 @@ function PresentPage() {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
-          <p className="mt-3 text-sm text-muted-foreground">
-            Loading presentation…
-          </p>
+          <p className="mt-3 text-sm text-muted-foreground">Loading presentation…</p>
         </div>
       </div>
     );
@@ -162,11 +149,7 @@ function PresentPage() {
               </Link>
             </Button>
             <Button size="sm" onClick={handleCopyPitch}>
-              {copied ? (
-                <Check className="mr-2 h-4 w-4" />
-              ) : (
-                <Copy className="mr-2 h-4 w-4" />
-              )}
+              {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
               {copied ? "Copied" : "Copy Pitch Summary"}
             </Button>
           </div>
@@ -199,26 +182,14 @@ function PresentPage() {
 
         {/* Big number row */}
         <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <BigStat
-            icon={Sparkles}
-            label="Novelty"
-            value={`${plan.noveltyScore}/100`}
-          />
-          <BigStat
-            icon={Target}
-            label="Feasibility"
-            value={`${plan.feasibilityScore}/100`}
-          />
+          <BigStat icon={Sparkles} label="Novelty" value={`${plan.noveltyScore}/100`} />
+          <BigStat icon={Target} label="Feasibility" value={`${plan.feasibilityScore}/100`} />
           <BigStat
             icon={DollarSign}
             label="Estimated cost"
             value={`$${(totalBudget / 1000).toFixed(1)}k`}
           />
-          <BigStat
-            icon={Calendar}
-            label="Duration"
-            value={`${plan.timeline.length} weeks`}
-          />
+          <BigStat icon={Calendar} label="Duration" value={`${plan.timeline.length} weeks`} />
         </div>
 
         {/* Literature QC */}
@@ -253,12 +224,8 @@ function PresentPage() {
                       Evidence · {p.year}
                       <ExternalLink className="h-3 w-3 opacity-60 transition-opacity group-hover:opacity-100" />
                     </div>
-                    <div className="line-clamp-3 text-sm font-medium leading-snug">
-                      {p.title}
-                    </div>
-                    <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                      {p.venue}
-                    </div>
+                    <div className="line-clamp-3 text-sm font-medium leading-snug">{p.title}</div>
+                    <div className="mt-1 line-clamp-1 text-xs text-muted-foreground">{p.venue}</div>
                   </a>
                 );
               })}
@@ -295,9 +262,7 @@ function PresentPage() {
                     {s.step}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-medium leading-tight">
-                      {s.title}
-                    </div>
+                    <div className="text-sm font-medium leading-tight">{s.title}</div>
                     <div className="mt-0.5 text-[10px] uppercase tracking-wider text-primary">
                       {s.phase} · {s.duration}
                     </div>
@@ -331,14 +296,9 @@ function PresentPage() {
                   {topSupplies.map((m, i) => {
                     const url = m.verification.sourceUrl;
                     return (
-                      <tr
-                        key={i}
-                        className="border-t border-border/60 bg-background/30"
-                      >
+                      <tr key={i} className="border-t border-border/60 bg-background/30">
                         <td className="px-3 py-2 font-medium">{m.name}</td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {m.vendor}
-                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">{m.vendor}</td>
                         <td className="px-3 py-2 font-mono text-xs">
                           {url ? (
                             <a
@@ -354,9 +314,7 @@ function PresentPage() {
                             m.catalog
                           )}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono">
-                          ${m.total}
-                        </td>
+                        <td className="px-3 py-2 text-right font-mono">${m.total}</td>
                       </tr>
                     );
                   })}
@@ -394,16 +352,12 @@ function PresentPage() {
                   key={wk.week}
                   className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-md border border-border/60 bg-background/40 px-3 py-2"
                 >
-                  <span className="font-mono text-xs text-primary">
-                    W{wk.week}
-                  </span>
+                  <span className="font-mono text-xs text-primary">W{wk.week}</span>
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
                     {wk.phase}
                   </span>
                   <span className="font-medium">{wk.milestone}</span>
-                  <span className="text-muted-foreground">
-                    — {wk.deliverable}
-                  </span>
+                  <span className="text-muted-foreground">— {wk.deliverable}</span>
                 </li>
               ))}
             </ol>
@@ -418,9 +372,7 @@ function PresentPage() {
               </h3>
             </div>
             <div className="rounded-lg border border-success/30 bg-success/5 p-4">
-              <div className="font-medium">
-                {plan.validation.primaryMetric.name}
-              </div>
+              <div className="font-medium">{plan.validation.primaryMetric.name}</div>
               <div className="mt-1 text-sm text-foreground/80">
                 <span className="font-semibold text-success">Target:</span>{" "}
                 {plan.validation.primaryMetric.target}
@@ -484,13 +436,9 @@ function PresentPage() {
         <Card className="mb-8 border-primary/30 bg-gradient-hero p-8 text-primary-foreground shadow-glow">
           <div className="mb-2 flex items-center gap-2">
             <Heart className="h-5 w-5" />
-            <h2 className="font-display text-2xl font-semibold tracking-tight">
-              Why this matters
-            </h2>
+            <h2 className="font-display text-2xl font-semibold tracking-tight">Why this matters</h2>
           </div>
-          <p className="text-base leading-relaxed md:text-lg">
-            {plan.whyItMatters}
-          </p>
+          <p className="text-base leading-relaxed md:text-lg">{plan.whyItMatters}</p>
         </Card>
 
         {/* Bottom actions */}
@@ -501,11 +449,7 @@ function PresentPage() {
             </Link>
           </Button>
           <Button onClick={handleCopyPitch}>
-            {copied ? (
-              <Check className="mr-2 h-4 w-4" />
-            ) : (
-              <Copy className="mr-2 h-4 w-4" />
-            )}
+            {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
             {copied ? "Copied" : "Copy Pitch Summary"}
           </Button>
         </div>
@@ -532,12 +476,8 @@ function BigStat({
       <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
         <Icon className="h-4 w-4" />
       </div>
-      <div className="text-xs uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-1 font-display text-3xl font-bold text-primary">
-        {value}
-      </div>
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="mt-1 font-display text-3xl font-bold text-primary">{value}</div>
     </Card>
   );
 }
