@@ -176,7 +176,55 @@ const REGISTRY: RegistryEntry[] = [
     unit_cost: 32,
     pack_size: "20 mL",
   },
+  {
+    key: "Cryovials, 2 mL, sterile",
+    aliases: [
+      "cryovial",
+      "cryovials",
+      "cryo vial",
+      "sample containers",
+      "freezing-medium aliquots",
+    ],
+    supplier: "Thermo Fisher Scientific / Nunc",
+    product: "Nunc storage vials with caps, 2.0 mL",
+    catalog: "09-740-71B",
+    category: "consumable",
+    source_url: "https://www.fishersci.com/shop/products/nunc-storage-vials-caps/0974071B",
+    unit_cost: 115,
+    pack_size: "case",
+  },
+  {
+    key: "Mr. Frosty controlled-rate freezing container",
+    aliases: ["mr. frosty", "mr frosty", "controlled-rate freezing", "freezing container"],
+    supplier: "Thermo Fisher Scientific / Nalgene",
+    product: "Mr. Frosty freezing container for controlled-rate cell freezing",
+    catalog: "5100-0001",
+    category: "equipment",
+    source_url: "https://www.thermofisher.com/order/catalog/product/5100-0001",
+    unit_cost: 220,
+    pack_size: "1 unit",
+  },
+  {
+    key: "Tissue culture plasticware bundle",
+    aliases: ["tissue culture plasticware", "t75", "6-well", "6 well", "plates", "tips"],
+    supplier: "Corning Life Sciences",
+    product: "T75 flasks, 6-well plates, and universal-fit pipette tips",
+    catalog: "CLS430641 / CLS3516 / 4803",
+    category: "consumable",
+    source_url:
+      "https://ecatalog.corning.com/life-sciences/b2b/US/en/Liquid-Handling/Pipet-Tips-and-Accessories/Pipet-Tips/Corning%C2%AE-Universal-Fit-200-%C2%B5L-and-1000-%C2%B5L-Pipet-Tips/p/corningUniversalFit200MicroLiterAnd1000MicroLiterPipetTips",
+    unit_cost: 520,
+    pack_size: "bundle",
+  },
 ];
+
+const GENERIC_NON_PURCHASABLE_TERMS = new Set([
+  "assay reagents",
+  "control samples",
+  "controls",
+  "positive controls",
+  "negative controls",
+]);
 
 function normalizeTerms(input: ResolveInput): string[] {
   const out = new Set<string>();
@@ -225,7 +273,7 @@ function normalizeTerms(input: ResolveInput): string[] {
       "Raw data recording template",
     ].forEach((s) => out.add(s));
   }
-  return Array.from(out);
+  return Array.from(out).filter((term) => !GENERIC_NON_PURCHASABLE_TERMS.has(term.toLowerCase()));
 }
 
 function matchEntry(term: string): RegistryEntry | null {

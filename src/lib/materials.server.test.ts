@@ -47,6 +47,27 @@ describe("runMaterialsResolver", () => {
     expect(result.data.map((m) => m.catalog)).toEqual(expect.arrayContaining(["VERIFY_REQUIRED"]));
   });
 
+  it("matches common cryopreservation consumables against the verified registry", async () => {
+    const result = await runMaterialsResolver({
+      required_materials: [
+        "Cryovials, 2 mL, sterile",
+        "Mr. Frosty / controlled-rate freezing container",
+        "Tissue culture plasticware (T75, 6-well plates, tips)",
+        "Assay reagents",
+        "Control samples",
+      ],
+    });
+
+    expect(result.debug.unmatchedCount).toBe(0);
+    expect(result.debug.used_fallback).toBe(false);
+    expect(result.data.map((m) => m.catalog)).toEqual(
+      expect.arrayContaining(["09-740-71B", "5100-0001", "CLS430641 / CLS3516 / 4803"]),
+    );
+    expect(result.data.map((m) => m.name)).not.toEqual(
+      expect.arrayContaining(["Assay reagents", "Control samples"]),
+    );
+  });
+
   it("uses PubChem as an identity-only fallback for known chemicals", async () => {
     vi.stubGlobal(
       "fetch",
