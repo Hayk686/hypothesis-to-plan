@@ -18,6 +18,7 @@ import { Route as ApiSearchPapersRouteImport } from './routes/api.search-papers'
 import { Route as ApiSearchLiteratureRouteImport } from './routes/api.search-literature'
 import { Route as ApiResolveMaterialsRouteImport } from './routes/api.resolve-materials'
 import { Route as ApiGeneratePlanRouteImport } from './routes/api.generate-plan'
+import { Route as ApiGenerateExampleRouteImport } from './routes/api.generate-example'
 import { Route as ProjectIdPresentRouteImport } from './routes/project.$id.present'
 
 const ProjectsRoute = ProjectsRouteImport.update({
@@ -65,6 +66,11 @@ const ApiGeneratePlanRoute = ApiGeneratePlanRouteImport.update({
   path: '/api/generate-plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGenerateExampleRoute = ApiGenerateExampleRouteImport.update({
+  id: '/api/generate-example',
+  path: '/api/generate-example',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectIdPresentRoute = ProjectIdPresentRouteImport.update({
   id: '/present',
   path: '/present',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/projects': typeof ProjectsRoute
+  '/api/generate-example': typeof ApiGenerateExampleRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/api/resolve-materials': typeof ApiResolveMaterialsRoute
   '/api/search-literature': typeof ApiSearchLiteratureRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/projects': typeof ProjectsRoute
+  '/api/generate-example': typeof ApiGenerateExampleRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/api/resolve-materials': typeof ApiResolveMaterialsRoute
   '/api/search-literature': typeof ApiSearchLiteratureRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
   '/projects': typeof ProjectsRoute
+  '/api/generate-example': typeof ApiGenerateExampleRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/api/resolve-materials': typeof ApiResolveMaterialsRoute
   '/api/search-literature': typeof ApiSearchLiteratureRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/new'
     | '/projects'
+    | '/api/generate-example'
     | '/api/generate-plan'
     | '/api/resolve-materials'
     | '/api/search-literature'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/'
     | '/new'
     | '/projects'
+    | '/api/generate-example'
     | '/api/generate-plan'
     | '/api/resolve-materials'
     | '/api/search-literature'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/new'
     | '/projects'
+    | '/api/generate-example'
     | '/api/generate-plan'
     | '/api/resolve-materials'
     | '/api/search-literature'
@@ -151,6 +163,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NewRoute: typeof NewRoute
   ProjectsRoute: typeof ProjectsRoute
+  ApiGenerateExampleRoute: typeof ApiGenerateExampleRoute
   ApiGeneratePlanRoute: typeof ApiGeneratePlanRoute
   ApiResolveMaterialsRoute: typeof ApiResolveMaterialsRoute
   ApiSearchLiteratureRoute: typeof ApiSearchLiteratureRoute
@@ -224,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGeneratePlanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/generate-example': {
+      id: '/api/generate-example'
+      path: '/api/generate-example'
+      fullPath: '/api/generate-example'
+      preLoaderRoute: typeof ApiGenerateExampleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/project/$id/present': {
       id: '/project/$id/present'
       path: '/present'
@@ -250,6 +270,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NewRoute: NewRoute,
   ProjectsRoute: ProjectsRoute,
+  ApiGenerateExampleRoute: ApiGenerateExampleRoute,
   ApiGeneratePlanRoute: ApiGeneratePlanRoute,
   ApiResolveMaterialsRoute: ApiResolveMaterialsRoute,
   ApiSearchLiteratureRoute: ApiSearchLiteratureRoute,

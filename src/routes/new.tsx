@@ -157,6 +157,7 @@ function NewProjectPage() {
   const [draftProject, setDraftProject] = useState<Project | null>(null);
   const [draftPlan, setDraftPlan] = useState<GeneratedPlan | null>(null);
   const [qcSourceLabel, setQcSourceLabel] = useState("Live literature search");
+  const [exampleLoading, setExampleLoading] = useState(false);
   const [form, setForm] = useState({
     title: "",
     hypothesis: "",
@@ -172,17 +173,45 @@ function NewProjectPage() {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
-  function loadDemo() {
-    setForm({
-      title: DEMO_PROJECT.title,
-      hypothesis: DEMO_PROJECT.hypothesis,
-      domain: DEMO_PROJECT.domain,
-      organism: DEMO_PROJECT.organism,
-      budget: DEMO_PROJECT.budget,
-      timelineWeeks: DEMO_PROJECT.timelineWeeks,
-      resources: DEMO_PROJECT.resources,
-      constraints: DEMO_PROJECT.constraints,
-    });
+  async function loadGeneratedExample() {
+    setExampleLoading(true);
+    try {
+      const res = await fetch("/api/generate-example", {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const example = (await res.json()) as Partial<typeof form>;
+      setForm({
+        title: typeof example.title === "string" ? example.title : DEMO_PROJECT.title,
+        hypothesis:
+          typeof example.hypothesis === "string" ? example.hypothesis : DEMO_PROJECT.hypothesis,
+        domain: typeof example.domain === "string" ? example.domain : DEMO_PROJECT.domain,
+        organism: typeof example.organism === "string" ? example.organism : DEMO_PROJECT.organism,
+        budget: typeof example.budget === "number" ? example.budget : DEMO_PROJECT.budget,
+        timelineWeeks:
+          typeof example.timelineWeeks === "number"
+            ? example.timelineWeeks
+            : DEMO_PROJECT.timelineWeeks,
+        resources:
+          typeof example.resources === "string" ? example.resources : DEMO_PROJECT.resources,
+        constraints:
+          typeof example.constraints === "string" ? example.constraints : DEMO_PROJECT.constraints,
+      });
+    } catch {
+      setForm({
+        title: DEMO_PROJECT.title,
+        hypothesis: DEMO_PROJECT.hypothesis,
+        domain: DEMO_PROJECT.domain,
+        organism: DEMO_PROJECT.organism,
+        budget: DEMO_PROJECT.budget,
+        timelineWeeks: DEMO_PROJECT.timelineWeeks,
+        resources: DEMO_PROJECT.resources,
+        constraints: DEMO_PROJECT.constraints,
+      });
+    } finally {
+      setExampleLoading(false);
+    }
   }
 
   async function handleSubmitHypothesis(e: React.FormEvent) {
@@ -292,9 +321,19 @@ function NewProjectPage() {
             </p>
           </div>
           {phase === "form" && (
-            <Button type="button" variant="outline" size="sm" onClick={loadDemo}>
-              <Wand2 className="mr-2 h-4 w-4" />
-              Load example
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={loadGeneratedExample}
+              disabled={exampleLoading}
+            >
+              {exampleLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Wand2 className="mr-2 h-4 w-4" />
+              )}
+              Generate example
             </Button>
           )}
         </div>
