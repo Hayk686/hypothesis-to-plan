@@ -79,6 +79,15 @@ function safeNum(v: unknown, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
+function literatureSourceLabel(source: LiteratureDebug["source"]): string {
+  if (source === "merged") return "Live scholarly indexes";
+  if (source === "semantic-scholar") return "Live Semantic Scholar";
+  if (source === "openalex") return "Live OpenAlex";
+  if (source === "crossref") return "Live Crossref";
+  if (source === "pubmed") return "Live PubMed";
+  return "Live literature search";
+}
+
 function normalizeScientistFeedback(v: unknown): LlmFeedbackCorrection[] {
   if (!Array.isArray(v)) return [];
   return v
@@ -449,7 +458,7 @@ export const Route = createFileRoute("/api/generate-plan")({
                 : "Similar work exists",
           reason:
             papers.length === 0
-              ? "No relevant papers returned by Semantic Scholar (after broader query variants) and PubMed enhancement returned nothing usable."
+              ? "No relevant papers returned by Semantic Scholar, OpenAlex, Crossref, or PubMed after broader query variants."
               : `Returned ${papers.length} relevant papers (top relevance ${Math.round((papers[0]?.relevance_score ?? 0) * 100)}%). Source mix: ${litDebug.source}.`,
           weak_evidence: evidenceWeak,
         };
@@ -539,12 +548,14 @@ export const Route = createFileRoute("/api/generate-plan")({
 
         const source_status = {
           literature: {
-            label: usedFallback.literature ? "Curated fallback" : "Live Semantic Scholar",
+            label: usedFallback.literature
+              ? "Curated fallback"
+              : literatureSourceLabel(litDebug.source),
             ok: !usedFallback.literature,
             coverage: usedFallback.literature ? "fallback" : "full",
             reason: usedFallback.literature
               ? `Fewer than 3 relevant papers after ${litDebug.attempts.length} query variant${litDebug.attempts.length === 1 ? "" : "s"}.`
-              : `Returned ${papers.length} papers via Semantic Scholar.`,
+              : `Returned ${papers.length} papers via ${literatureSourceLabel(litDebug.source)}.`,
           },
           protocols: {
             label: usedFallback.protocols ? "Curated fallback" : "Live protocols.io",

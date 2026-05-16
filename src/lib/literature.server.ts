@@ -8,8 +8,8 @@
 //   3. If we have <3 relevant papers, try broader query variants
 //      (cryopreservation / DMSO / HeLa / post-thaw etc.).
 //   4. Merge & dedupe by paperId / DOI / lowercased-title.
-//   5. Optionally enhance with PubMed if NCBI_API_KEY is present.
-//      PubMed is silent: missing key never blocks generation.
+//   5. Fall back through OpenAlex, Crossref, then PubMed.
+//      Missing optional keys never block generation.
 // All secrets are read here from process.env and never returned.
 // ============================================================
 
@@ -18,10 +18,15 @@ import { buildAgentProfile } from "@/lib/agentProfile.server";
 const S2_ENDPOINT = "https://api.semanticscholar.org/graph/v1/paper/search";
 const S2_FIELDS =
   "paperId,title,abstract,year,venue,url,externalIds,citationCount,influentialCitationCount,authors,tldr";
+const OPENALEX_WORKS = "https://api.openalex.org/works";
+const CROSSREF_WORKS = "https://api.crossref.org/v1/works";
 const PUBMED_ESEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
 const PUBMED_ESUMMARY = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi";
 
 const SUCCESS_THRESHOLD = 3;
+const FALLBACK_QUERY_LIMIT = 3;
+
+export type LiteratureSource = "semantic-scholar" | "openalex" | "crossref" | "pubmed";
 
 export type LiteratureInput = {
   hypothesis?: unknown;
@@ -45,12 +50,12 @@ export type NormalizedPaper = {
   pmid: string | null;
   relevance_score: number;
   evidence_role: "primary" | "supporting" | "background";
-  source: "semantic-scholar" | "pubmed";
+  source: LiteratureSource;
   tldr: string | null;
 };
 
 export type LiteratureAttempt = {
-  source_name: "semantic-scholar" | "pubmed";
+  source_name: LiteratureSource;
   query: string;
   status_code: number;
   result_count: number;
@@ -60,13 +65,18 @@ export type LiteratureAttempt = {
 export type LiteratureDebug = {
   proxyUsed: true;
   hasSemanticScholarKey: boolean;
+  hasOpenAlexKey: boolean;
+  hasOpenAlexEmail: boolean;
+  hasCrossrefMailto: boolean;
   hasPubMedKey: boolean;
   primaryQuery: string;
   attempts: LiteratureAttempt[];
   semanticScholarStatus: number; // last s2 status (back-compat)
+  openAlexStatus: number;
+  crossrefStatus: number;
   pubmedStatus: number; // last pm status (back-compat)
   resultCount: number;
-  source: "semantic-scholar" | "pubmed" | "merged" | "none";
+  source: LiteratureSource | "merged" | "none";
   used_fallback: boolean;
   errors: string[];
 };
@@ -236,6 +246,25 @@ function evidenceRole(idx: number): NormalizedPaper["evidence_role"] {
   return "background";
 }
 
+function formatAuthors(names: string[]): string {
+  const clean = names.map((n) => n.trim()).filter(Boolean);
+  if (clean.length === 0) return "Unknown authors";
+  return clean.slice(0, 4).join(", ") + (clean.length > 4 ? ", et al." : "");
+}
+
+function stripTags(text: string | undefined | null): string {
+  return (text ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function userAgent(email?: string): string {
+  return email
+    ? `HypothesisToPlan/1.0 (mailto:${email})`
+    : "HypothesisToPlan/1.0 (https://github.com/Hayk686/hypothesis-to-plan)";
+}
+
 // ---------- Semantic Scholar ----------
 
 type S2Author = { name?: string };
@@ -271,11 +300,7 @@ async function fetchSemanticScholar(
     const json = (await res.json()) as { data?: S2Paper[] };
     const items = (json.data ?? []).filter((p) => p && p.title);
     const papers: NormalizedPaper[] = items.slice(0, 10).map((p, idx) => {
-      const authorsArr = (p.authors ?? []).map((a) => a.name ?? "").filter(Boolean);
-      const authors =
-        authorsArr.length === 0
-          ? "Unknown authors"
-          : authorsArr.slice(0, 4).join(", ") + (authorsArr.length > 4 ? ", et al." : "");
+      const authors = formatAuthors((p.authors ?? []).map((a) => a.name ?? ""));
       const doi = p.externalIds?.DOI ?? null;
       const pmid = p.externalIds?.PubMed ?? null;
       const sourceUrl =
@@ -307,6 +332,189 @@ async function fetchSemanticScholar(
       status: 0,
       papers: [],
       error: err instanceof Error ? err.message : "Semantic Scholar fetch failed",
+    };
+  }
+}
+
+// ---------- OpenAlex (free tier / optional API key) ----------
+
+type OpenAlexWork = {
+  id?: string;
+  doi?: string | null;
+  display_name?: string | null;
+  publication_year?: number | null;
+  cited_by_count?: number | null;
+  abstract_inverted_index?: Record<string, number[]> | null;
+  authorships?: { author?: { display_name?: string | null } | null }[];
+  primary_location?: {
+    landing_page_url?: string | null;
+    source?: { display_name?: string | null } | null;
+  } | null;
+};
+
+function openAlexAbstract(index: OpenAlexWork["abstract_inverted_index"]): string {
+  if (!index) return "Abstract unavailable from OpenAlex.";
+  const words: Array<{ word: string; pos: number }> = [];
+  for (const [word, positions] of Object.entries(index)) {
+    for (const pos of positions) words.push({ word, pos });
+  }
+  return words
+    .sort((a, b) => a.pos - b.pos)
+    .map((w) => w.word)
+    .join(" ");
+}
+
+async function fetchOpenAlex(
+  query: string,
+  apiKey: string | undefined,
+  email: string | undefined,
+): Promise<{ status: number; papers: NormalizedPaper[]; error: string | null }> {
+  const params = new URLSearchParams({
+    search: query,
+    "per-page": "8",
+    select:
+      "id,doi,display_name,publication_year,primary_location,cited_by_count,authorships,abstract_inverted_index",
+  });
+  if (apiKey) params.set("api_key", apiKey);
+  else if (email) params.set("mailto", email);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(`${OPENALEX_WORKS}?${params.toString()}`, {
+      headers: { Accept: "application/json", "User-Agent": userAgent(email) },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      return { status: res.status, papers: [], error: `OpenAlex HTTP ${res.status}` };
+    }
+    const json = (await res.json()) as { results?: OpenAlexWork[] };
+    const papers: NormalizedPaper[] = (json.results ?? [])
+      .filter((w) => w.display_name)
+      .slice(0, 8)
+      .map((w, idx) => {
+        const doi = w.doi?.replace(/^https?:\/\/doi\.org\//i, "") ?? null;
+        const citations = w.cited_by_count ?? 0;
+        return {
+          id: w.id ?? `oa-${idx}`,
+          title: w.display_name ?? "Untitled",
+          authors: formatAuthors(
+            (w.authorships ?? []).map((a) => a.author?.display_name ?? "").filter(Boolean),
+          ),
+          year: w.publication_year ?? 0,
+          venue: w.primary_location?.source?.display_name ?? "OpenAlex",
+          abstract: openAlexAbstract(w.abstract_inverted_index),
+          citation_count: citations,
+          influential_citation_count: 0,
+          source_url:
+            w.primary_location?.landing_page_url ?? (doi ? `https://doi.org/${doi}` : (w.id ?? "")),
+          doi,
+          pmid: null,
+          relevance_score: relevanceScore(idx, citations),
+          evidence_role: evidenceRole(idx),
+          source: "openalex",
+          tldr: null,
+        };
+      });
+    return { status: res.status, papers, error: null };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    return {
+      status: 0,
+      papers: [],
+      error: err instanceof Error ? err.message : "OpenAlex fetch failed",
+    };
+  }
+}
+
+// ---------- Crossref (public REST API / polite mailto optional) ----------
+
+type CrossrefAuthor = { given?: string; family?: string; name?: string };
+type CrossrefWork = {
+  DOI?: string;
+  title?: string[];
+  author?: CrossrefAuthor[];
+  issued?: { "date-parts"?: number[][] };
+  published?: { "date-parts"?: number[][] };
+  "published-print"?: { "date-parts"?: number[][] };
+  "published-online"?: { "date-parts"?: number[][] };
+  "container-title"?: string[];
+  URL?: string;
+  abstract?: string;
+  "is-referenced-by-count"?: number;
+};
+
+function crossrefYear(item: CrossrefWork): number {
+  const date =
+    item["published-print"]?.["date-parts"]?.[0] ??
+    item["published-online"]?.["date-parts"]?.[0] ??
+    item.published?.["date-parts"]?.[0] ??
+    item.issued?.["date-parts"]?.[0] ??
+    [];
+  return typeof date[0] === "number" ? date[0] : 0;
+}
+
+async function fetchCrossref(
+  query: string,
+  mailto: string | undefined,
+): Promise<{ status: number; papers: NormalizedPaper[]; error: string | null }> {
+  const params = new URLSearchParams({
+    query,
+    rows: "8",
+    sort: "relevance",
+    filter: "type:journal-article",
+  });
+  if (mailto) params.set("mailto", mailto);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(`${CROSSREF_WORKS}?${params.toString()}`, {
+      headers: { Accept: "application/json", "User-Agent": userAgent(mailto) },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      return { status: res.status, papers: [], error: `Crossref HTTP ${res.status}` };
+    }
+    const json = (await res.json()) as { message?: { items?: CrossrefWork[] } };
+    const papers: NormalizedPaper[] = (json.message?.items ?? [])
+      .filter((w) => w.title?.[0])
+      .slice(0, 8)
+      .map((w, idx) => {
+        const doi = w.DOI ?? null;
+        const citations = w["is-referenced-by-count"] ?? 0;
+        const authors = formatAuthors(
+          (w.author ?? []).map((a) =>
+            a.name ? a.name : `${a.given ?? ""} ${a.family ?? ""}`.trim(),
+          ),
+        );
+        return {
+          id: doi ? `cr-${doi}` : `cr-${idx}-${w.title?.[0]?.slice(0, 24)}`,
+          title: w.title?.[0] ?? "Untitled",
+          authors,
+          year: crossrefYear(w),
+          venue: w["container-title"]?.[0] ?? "Crossref",
+          abstract: stripTags(w.abstract) || "Abstract unavailable from Crossref.",
+          citation_count: citations,
+          influential_citation_count: 0,
+          source_url: w.URL ?? (doi ? `https://doi.org/${doi}` : ""),
+          doi,
+          pmid: null,
+          relevance_score: relevanceScore(idx, citations),
+          evidence_role: evidenceRole(idx),
+          source: "crossref",
+          tldr: null,
+        };
+      });
+    return { status: res.status, papers, error: null };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    return {
+      status: 0,
+      papers: [],
+      error: err instanceof Error ? err.message : "Crossref fetch failed",
     };
   }
 }
@@ -359,11 +567,7 @@ async function fetchPubMed(
       .map((id, idx): NormalizedPaper | null => {
         const item = result[id];
         if (!item || !item.title) return null;
-        const authors = (item.authors ?? []).map((a) => a.name ?? "").filter(Boolean);
-        const authorStr =
-          authors.length === 0
-            ? "Unknown authors"
-            : authors.slice(0, 4).join(", ") + (authors.length > 4 ? ", et al." : "");
+        const authorStr = formatAuthors((item.authors ?? []).map((a) => a.name ?? ""));
         const yearMatch = (item.pubdate ?? "").match(/\d{4}/);
         const year = yearMatch ? Number(yearMatch[0]) : 0;
         const doi = item.articleids?.find((a) => a.idtype === "doi")?.value ?? null;
@@ -466,8 +670,14 @@ function rerank(papers: NormalizedPaper[], queries: string[]): NormalizedPaper[]
 
 export async function runLiteratureSearch(input: LiteratureInput): Promise<LiteratureResult> {
   const s2Key = process.env.SEMANTIC_SCHOLAR_API_KEY;
+  const openAlexKey = process.env.OPENALEX_API_KEY;
+  const openAlexEmail = process.env.OPENALEX_EMAIL ?? process.env.CROSSREF_MAILTO;
+  const crossrefMailto = process.env.CROSSREF_MAILTO ?? process.env.OPENALEX_EMAIL;
   const pubmedKey = process.env.NCBI_API_KEY;
   const hasSemanticScholarKey = Boolean(s2Key);
+  const hasOpenAlexKey = Boolean(openAlexKey);
+  const hasOpenAlexEmail = Boolean(openAlexEmail);
+  const hasCrossrefMailto = Boolean(crossrefMailto);
   const hasPubMedKey = Boolean(pubmedKey);
 
   const primary = buildPrimaryQuery(input);
@@ -478,6 +688,9 @@ export async function runLiteratureSearch(input: LiteratureInput): Promise<Liter
   const errors: string[] = [];
   let papers: NormalizedPaper[] = [];
   let lastS2Status = 0;
+  let lastOpenAlexStatus = 0;
+  let lastCrossrefStatus = 0;
+  let lastPubmedStatus = 0;
 
   for (const q of allQueries) {
     const r = await fetchSemanticScholar(q, s2Key);
@@ -496,8 +709,45 @@ export async function runLiteratureSearch(input: LiteratureInput): Promise<Liter
     if (papers.length >= SUCCESS_THRESHOLD) break;
   }
 
-  // Optional PubMed enhancement (silent if it fails or no key).
-  let lastPubmedStatus = 0;
+  const fallbackQueries = allQueries.slice(0, FALLBACK_QUERY_LIMIT);
+
+  if (papers.length < SUCCESS_THRESHOLD) {
+    for (const q of fallbackQueries) {
+      const oa = await fetchOpenAlex(q, openAlexKey, openAlexEmail);
+      lastOpenAlexStatus = oa.status;
+      attempts.push({
+        source_name: "openalex",
+        query: q,
+        status_code: oa.status,
+        result_count: oa.papers.length,
+        error_message: oa.error,
+      });
+      if (oa.error) errors.push(oa.error);
+      if (oa.papers.length > 0) papers = dedupeMerge(papers, oa.papers);
+      if (papers.length >= SUCCESS_THRESHOLD) break;
+    }
+  }
+
+  if (papers.length < SUCCESS_THRESHOLD) {
+    for (const q of fallbackQueries) {
+      const cr = await fetchCrossref(q, crossrefMailto);
+      lastCrossrefStatus = cr.status;
+      attempts.push({
+        source_name: "crossref",
+        query: q,
+        status_code: cr.status,
+        result_count: cr.papers.length,
+        error_message: cr.error,
+      });
+      if (cr.error) errors.push(cr.error);
+      if (cr.papers.length > 0) papers = dedupeMerge(papers, cr.papers);
+      if (papers.length >= SUCCESS_THRESHOLD) break;
+    }
+  }
+
+  // PubMed is most useful for biomedical domains; keep it as a final enhancement
+  // after broader scholarly indexes so materials/engineering projects do not get
+  // mislabeled as PubMed-sourced just because Semantic Scholar rate-limited.
   if (papers.length < SUCCESS_THRESHOLD) {
     const pmQuery = primary || allQueries[0] || "cell viability";
     const pm = await fetchPubMed(pmQuery, pubmedKey);
@@ -524,17 +774,26 @@ export async function runLiteratureSearch(input: LiteratureInput): Promise<Liter
         ? "merged"
         : sourcesPresent.has("semantic-scholar")
           ? "semantic-scholar"
-          : "pubmed";
+          : sourcesPresent.has("openalex")
+            ? "openalex"
+            : sourcesPresent.has("crossref")
+              ? "crossref"
+              : "pubmed";
 
   return {
     data: papers,
     debug: {
       proxyUsed: true,
       hasSemanticScholarKey,
+      hasOpenAlexKey,
+      hasOpenAlexEmail,
+      hasCrossrefMailto,
       hasPubMedKey,
       primaryQuery: primary,
       attempts,
       semanticScholarStatus: lastS2Status,
+      openAlexStatus: lastOpenAlexStatus,
+      crossrefStatus: lastCrossrefStatus,
       pubmedStatus: lastPubmedStatus,
       resultCount: papers.length,
       source,

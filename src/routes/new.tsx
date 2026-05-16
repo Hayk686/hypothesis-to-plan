@@ -50,6 +50,16 @@ const DOMAINS = [
 ];
 
 type Phase = "form" | "qc-loading" | "qc-review" | "plan-loading";
+type LiteratureSource = "semantic-scholar" | "openalex" | "crossref" | "pubmed";
+
+function literatureSourceLabel(source?: LiteratureSource | "merged" | "none"): string {
+  if (source === "merged") return "Live scholarly indexes";
+  if (source === "semantic-scholar") return "Live Semantic Scholar";
+  if (source === "openalex") return "Live OpenAlex";
+  if (source === "crossref") return "Live Crossref";
+  if (source === "pubmed") return "Live PubMed";
+  return "Live literature search";
+}
 
 type LiveQcPaper = {
   id: string;
@@ -63,19 +73,19 @@ type LiveQcPaper = {
   doi: string | null;
   relevance_score: number;
   evidence_role: "primary" | "supporting" | "background";
-  source: "semantic-scholar" | "pubmed";
+  source: LiteratureSource;
 };
 
 type LiveQcResponse = {
   data?: LiveQcPaper[];
   debug?: {
-    source?: "semantic-scholar" | "pubmed" | "merged" | "none";
+    source?: LiteratureSource | "merged" | "none";
     used_fallback?: boolean;
     primaryQuery?: string;
     resultCount?: number;
     errors?: string[];
     attempts?: {
-      source_name: "semantic-scholar" | "pubmed";
+      source_name: LiteratureSource;
       query: string;
       status_code: number;
       result_count: number;
@@ -95,6 +105,7 @@ type LiveQcDiagnostics = {
 };
 
 function livePaperToPlanPaper(p: LiveQcPaper) {
+  const sourceLabel = literatureSourceLabel(p.source).replace(/^Live /, "");
   return {
     id: p.id,
     title: p.title,
@@ -104,14 +115,12 @@ function livePaperToPlanPaper(p: LiveQcPaper) {
     citations: p.citation_count,
     similarity: p.relevance_score,
     abstract: p.abstract,
-    whyItMatters: `${p.evidence_role} evidence returned by live ${
-      p.source === "semantic-scholar" ? "Semantic Scholar" : "PubMed"
-    } search for this hypothesis.`,
+    whyItMatters: `${p.evidence_role} evidence returned by live ${sourceLabel} search for this hypothesis.`,
     doi: p.source_url,
     verification: {
       status: "verified" as const,
       sourceUrl: p.source_url,
-      note: `Live ${p.source === "semantic-scholar" ? "Semantic Scholar" : "PubMed"} Literature QC result.`,
+      note: `Live ${sourceLabel} Literature QC result.`,
       checkedAt: new Date().toISOString().slice(0, 10),
     },
   };
@@ -201,14 +210,7 @@ async function runLiveLiteratureQc(project: Project): Promise<{
       : count >= 3 && !debug?.used_fallback
         ? "verified"
         : "weak";
-  const sourceLabel =
-    debug?.source === "merged"
-      ? "Live Semantic Scholar + PubMed"
-      : debug?.source === "pubmed"
-        ? "Live PubMed"
-        : debug?.source === "semantic-scholar"
-          ? "Live Semantic Scholar"
-          : "Live literature search";
+  const sourceLabel = literatureSourceLabel(debug?.source);
 
   const result =
     status === "unavailable"
@@ -574,8 +576,8 @@ function NewProjectPage() {
               Checking published literature…
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              Querying live Semantic Scholar/PubMed for prior work, similar studies, and exact
-              matches.
+              Querying live Semantic Scholar, OpenAlex, Crossref, and PubMed for prior work, similar
+              studies, and exact matches.
             </p>
           </Card>
         )}

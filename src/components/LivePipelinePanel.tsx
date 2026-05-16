@@ -319,6 +319,8 @@ export function SourceBadge({
 }: {
   source:
     | "live-semantic-scholar"
+    | "openalex"
+    | "crossref"
     | "pubmed"
     | "protocols.io"
     | "verified-supplier"
@@ -332,6 +334,8 @@ export function SourceBadge({
       cls: "border-success/40 bg-success/10 text-success",
     },
     pubmed: { label: "PubMed", cls: "border-primary/40 bg-primary/10 text-primary" },
+    openalex: { label: "OpenAlex", cls: "border-success/40 bg-success/10 text-success" },
+    crossref: { label: "Crossref", cls: "border-success/40 bg-success/10 text-success" },
     "protocols.io": { label: "protocols.io", cls: "border-success/40 bg-success/10 text-success" },
     "verified-supplier": {
       label: "Verified supplier source",

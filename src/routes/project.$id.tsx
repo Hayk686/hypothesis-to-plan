@@ -55,6 +55,15 @@ import { ScientistFeedbackPanel } from "@/components/ScientistFeedbackPanel";
 import { LivePipelinePanel, SourceBadge } from "@/components/LivePipelinePanel";
 import { computeLabReadiness } from "@/lib/labReadiness";
 
+function literatureSourceLabel(source?: string): string {
+  if (source === "semantic-scholar") return "Semantic Scholar";
+  if (source === "openalex") return "OpenAlex";
+  if (source === "crossref") return "Crossref";
+  if (source === "pubmed") return "PubMed";
+  if (source === "merged") return "scholarly indexes";
+  return "literature search";
+}
+
 export const Route = createFileRoute("/project/$id")({
   head: () => ({
     meta: [
@@ -454,7 +463,15 @@ function ProjectPage() {
                     </h3>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    <SourceBadge source="live-semantic-scholar" />
+                    {livePlan.evidence_map.some((e) => e.source === "semantic-scholar") && (
+                      <SourceBadge source="live-semantic-scholar" />
+                    )}
+                    {livePlan.evidence_map.some((e) => e.source === "openalex") && (
+                      <SourceBadge source="openalex" />
+                    )}
+                    {livePlan.evidence_map.some((e) => e.source === "crossref") && (
+                      <SourceBadge source="crossref" />
+                    )}
                     {livePlan.evidence_map.some((e) => e.source === "pubmed") && (
                       <SourceBadge source="pubmed" />
                     )}
@@ -496,7 +513,7 @@ function ProjectPage() {
             {(() => {
               // Provenance priority: livePlan.source_status.literature wins over
               // the legacy paperSource state (which only updates when the user
-              // clicks "Refresh from Semantic Scholar"). This guarantees the
+              // clicks the refresh button). This guarantees the
               // Related work badge stays consistent with the Real-data pipeline
               // panel after a /api/generate-plan run.
               const liveLit = livePlan?.source_status?.literature ?? null;
@@ -524,12 +541,7 @@ function ProjectPage() {
                       verification: {
                         status: "verified",
                         sourceUrl: e.source_url,
-                        note:
-                          e.source === "semantic-scholar"
-                            ? "Semantic Scholar"
-                            : e.source === "pubmed"
-                              ? "PubMed"
-                              : "Curated fallback",
+                        note: literatureSourceLabel(e.source),
                         checkedAt: new Date().toISOString().slice(0, 10),
                       },
                     }))
@@ -538,7 +550,7 @@ function ProjectPage() {
               const isRateLimited = /rate limit/i.test(paperSourceNote);
               const sourceLabel = liveLit
                 ? liveLit.ok
-                  ? "LIVE SEMANTIC SCHOLAR"
+                  ? liveLit.label.toUpperCase()
                   : "Curated fallback"
                 : paperSource === "live-api"
                   ? "Live Semantic Scholar"
@@ -551,7 +563,7 @@ function ProjectPage() {
                     : isDemoProject
                       ? "Verified seeded data"
                       : literatureLoading
-                        ? "Querying Semantic Scholar"
+                        ? "Querying literature"
                         : "Live literature pending";
               const sourceClass = liveLit
                 ? liveLit.ok
@@ -564,7 +576,7 @@ function ProjectPage() {
                     : "border-warning/40 bg-warning/10 text-warning-foreground";
               const sourceNote = liveLit
                 ? liveLit.ok
-                  ? `Returned ${displayPapers.length} papers via Semantic Scholar.`
+                  ? `Returned ${displayPapers.length} papers via ${liveLit.label}.`
                   : liveLit.reason
                 : paperSourceNote;
               return (

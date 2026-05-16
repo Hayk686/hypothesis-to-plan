@@ -16,6 +16,9 @@ Do not prefix private keys with `VITE_`.
 
 ```txt
 SEMANTIC_SCHOLAR_API_KEY=
+OPENALEX_API_KEY=
+OPENALEX_EMAIL=
+CROSSREF_MAILTO=
 NCBI_API_KEY=
 PROTOCOLS_IO_CLIENT_TOKEN=
 LLM_PROVIDER=openrouter
@@ -47,6 +50,6 @@ NVIDIA_MODEL=openai/gpt-oss-20b
 - Open `/new` and click `Generate example`.
 - Run a literature QC for a non-HeLa hypothesis.
 - Open a generated project and verify source badges:
-  - Semantic Scholar or PubMed for literature
+  - Semantic Scholar, OpenAlex, Crossref, or PubMed for literature
   - protocols.io or explicit curated fallback for protocols
   - OpenRouter/NVIDIA or deterministic fallback for LLM

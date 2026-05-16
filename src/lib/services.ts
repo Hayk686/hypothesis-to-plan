@@ -344,7 +344,7 @@ export type LivePlanPaper = {
   pmid: string | null;
   relevance_score: number;
   evidence_role: "primary" | "supporting" | "background";
-  source: "semantic-scholar" | "pubmed";
+  source: "semantic-scholar" | "openalex" | "crossref" | "pubmed";
   tldr: string | null;
 };
 
@@ -388,7 +388,7 @@ export type LivePlanResponse = {
     id: string;
     title: string;
     role: "primary" | "supporting" | "background";
-    source: "semantic-scholar" | "pubmed";
+    source: "semantic-scholar" | "openalex" | "crossref" | "pubmed";
     source_url: string;
     relevance_score: number;
     year: number;
