@@ -32,7 +32,7 @@ export const Route = createFileRoute("/api/resolve-materials")({
         } catch {
           return jsonResponse({ error: "Invalid JSON body." }, 400);
         }
-        const result = runMaterialsResolver(input);
+        const result = await runMaterialsResolver(input);
         return jsonResponse(result);
       },
     },

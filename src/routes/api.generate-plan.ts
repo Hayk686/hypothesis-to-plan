@@ -357,7 +357,7 @@ export const Route = createFileRoute("/api/generate-plan")({
             : llmRequiredMaterials.length > 0
               ? llmRequiredMaterials
               : agentProfile.defaultMaterials;
-        const mat = runMaterialsResolver({
+        const mat = await runMaterialsResolver({
           organism_or_system: organism,
           assay_type: domain,
           domain,
@@ -398,6 +398,7 @@ export const Route = createFileRoute("/api/generate-plan")({
             pack_size: m.pack_size,
             source_url: m.source_url,
             verified: m.verified,
+            source: m.source,
             note: m.note,
           })),
           subtotal_verified: totalMaterials,
@@ -568,8 +569,12 @@ export const Route = createFileRoute("/api/generate-plan")({
           materials: {
             label:
               matDebug.unmatchedCount > 0
-                ? "Verified registry (partial)"
-                : "Verified supplier registry",
+                ? matDebug.mouserMatchedCount > 0 || matDebug.pubchemMatchedCount > 0
+                  ? "Supplier APIs (partial)"
+                  : "Verified registry (partial)"
+                : matDebug.mouserMatchedCount > 0
+                  ? "Live Mouser supplier data"
+                  : "Verified supplier registry",
             ok: matDebug.matchedCount > 0 && matDebug.unmatchedCount === 0,
             coverage:
               matDebug.matchedCount === 0
@@ -577,7 +582,7 @@ export const Route = createFileRoute("/api/generate-plan")({
                 : matDebug.unmatchedCount > 0
                   ? "partial"
                   : "full",
-            reason: `${matDebug.matchedCount} matched / ${matDebug.unmatchedCount} unverified (registry size ${matDebug.registrySize}).`,
+            reason: `${matDebug.matchedCount} supplier-verified / ${matDebug.unmatchedCount} requiring vendor SKU; Mouser ${matDebug.mouserMatchedCount}, PubChem identity ${matDebug.pubchemMatchedCount}.`,
           },
           llm: {
             label: llmDebug.used_fallback

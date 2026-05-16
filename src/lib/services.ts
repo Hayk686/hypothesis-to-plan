@@ -369,6 +369,7 @@ export type LivePlanMaterial = {
   pack_size: string;
   source_url: string;
   verified: boolean;
+  source?: "verified-supplier-registry" | "mouser" | "pubchem" | "unverified";
   note: string;
 };
 
