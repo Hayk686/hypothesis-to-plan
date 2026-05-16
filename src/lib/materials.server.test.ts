@@ -31,4 +31,14 @@ describe("runMaterialsResolver", () => {
       unit_cost: 0,
     });
   });
+
+  it("does not inject HeLa defaults for non-biological empty requests", () => {
+    const result = runMaterialsResolver({
+      assay_type: "machine learning benchmark",
+      required_materials: [],
+    });
+
+    expect(result.data.map((m) => m.name)).not.toEqual(expect.arrayContaining(["HeLa cells"]));
+    expect(result.data.map((m) => m.catalog)).toEqual(expect.arrayContaining(["VERIFY_REQUIRED"]));
+  });
 });

@@ -1,6 +1,7 @@
 import type { NormalizedPaper } from "@/lib/literature.server";
 import type { NormalizedProtocol } from "@/lib/protocols.server";
 import type { LlmFeedbackCorrection } from "@/lib/scientistFeedback";
+import { buildAgentProfile, type AgentProfile } from "@/lib/agentProfile.server";
 
 export type LlmProvider = "openrouter" | "nvidia" | "none";
 
@@ -135,6 +136,7 @@ function buildPrompt(
   papers: NormalizedPaper[],
   protocols: NormalizedProtocol[],
   feedback: LlmFeedbackCorrection[] = [],
+  agentProfile: AgentProfile = buildAgentProfile(project),
 ) {
   const paperContext = papers.slice(0, 8).map((p) => ({
     title: p.title,
@@ -159,6 +161,15 @@ function buildPrompt(
     {
       task: "Create a source-grounded experimental plan. Use the literature and protocols below. Do not invent citations, catalog numbers, or claims not supported by the supplied sources. Return only valid JSON matching the requested shape.",
       project,
+      agent_profile: {
+        domain_kind: agentProfile.kind,
+        label: agentProfile.label,
+        planning_rule:
+          "Adapt the plan to this domain. For non-wet-lab work, use compute, datasets, instruments, field sampling, prototypes, or domain resources instead of biological reagents.",
+        default_material_or_resource_hints: agentProfile.defaultMaterials,
+        validation_defaults: agentProfile.validation,
+        risk_templates: agentProfile.risks,
+      },
       literature: paperContext,
       protocols: protocolContext,
       expert_feedback_memory: feedback.slice(0, 6),
@@ -223,8 +234,10 @@ function buildPrompt(
 
 function systemPrompt() {
   return [
-    "You are a careful research co-scientist and experimental design orchestrator.",
+    "You are a careful universal research co-scientist and experimental design orchestrator.",
+    "You adapt across life science, materials science, computational, environmental, engineering, and general research projects.",
     "You must be conservative, source-grounded, and explicit about uncertainty.",
+    "Do not force wet-lab assumptions into computational, field, materials, or engineering work.",
     "When prior scientist feedback is supplied, use it as high-priority expert context for similar experiment types.",
     "You may propose practical experimental steps, but you must not provide clinical, diagnostic, or human-subject instructions.",
     "Return only JSON. No Markdown. No prose outside JSON.",
@@ -422,6 +435,7 @@ export async function runLlmOrchestrator({
   feedback?: LlmFeedbackCorrection[];
 }): Promise<LlmResult> {
   const config = providerConfig();
+  const agentProfile = buildAgentProfile(project);
   if (!config) {
     return {
       plan: null,
@@ -447,7 +461,7 @@ export async function runLlmOrchestrator({
       provider: config.provider,
       messages: [
         { role: "system", content: systemPrompt() },
-        { role: "user", content: buildPrompt(project, papers, protocols, feedback) },
+        { role: "user", content: buildPrompt(project, papers, protocols, feedback, agentProfile) },
       ],
     });
     const plan = normalizePlan(extractJson(content), project);

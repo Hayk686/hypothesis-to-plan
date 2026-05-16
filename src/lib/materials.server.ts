@@ -11,6 +11,8 @@ export type ResolveInput = {
   protocol_steps?: unknown;
   organism_or_system?: unknown;
   assay_type?: unknown;
+  domain?: unknown;
+  constraints?: unknown;
   required_materials?: unknown;
 };
 
@@ -175,6 +177,8 @@ function normalizeTerms(input: ResolveInput): string[] {
   }
   addContext(input.organism_or_system);
   addContext(input.assay_type);
+  addContext(input.domain);
+  addContext(input.constraints);
   const context = contextParts.join(" ").toLowerCase();
   if (/hela/.test(context)) out.add("HeLa cells");
   if (/trehalose/.test(context)) out.add("Trehalose");
@@ -185,14 +189,9 @@ function normalizeTerms(input: ResolveInput): string[] {
   if (/viability|trypan|count|assay/.test(context)) out.add("Trypan Blue");
   if (out.size === 0) {
     [
-      "HeLa cells",
-      "Trehalose",
-      "DMSO",
-      "DMEM",
-      "FBS",
-      "PBS",
-      "Trypsin-EDTA",
-      "Trypan Blue",
+      "Domain-specific material or data resource",
+      "Measurement or instrument access",
+      "Raw data recording template",
     ].forEach((s) => out.add(s));
   }
   return Array.from(out);

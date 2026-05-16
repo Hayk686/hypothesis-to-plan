@@ -13,6 +13,8 @@
 // All secrets are read here from process.env and never returned.
 // ============================================================
 
+import { buildAgentProfile } from "@/lib/agentProfile.server";
+
 const S2_ENDPOINT = "https://api.semanticscholar.org/graph/v1/paper/search";
 const S2_FIELDS =
   "paperId,title,abstract,year,venue,url,externalIds,citationCount,influentialCitationCount,authors,tldr";
@@ -161,15 +163,24 @@ function buildPrimaryQuery(input: LiteratureInput): string {
   return out.join(" ").slice(0, 300);
 }
 
-/**
- * Heuristic query variants. We pick the ones whose theme appears in the
- * hypothesis text (so we don't fire totally unrelated queries). Every
- * project gets the generic "cell viability assay" / "cell culture" backups.
- */
 function buildQueryVariants(input: LiteratureInput, primary: string): string[] {
+  const profile = buildAgentProfile(input);
   const text = `${typeof input.hypothesis === "string" ? input.hypothesis : ""} ${
     typeof input.domain === "string" ? input.domain : ""
   } ${typeof input.organism_or_system === "string" ? input.organism_or_system : ""}`.toLowerCase();
+
+  const variants: string[] = [];
+  const seen = new Set<string>([primary.toLowerCase()]);
+  for (const q of profile.literatureQueries) {
+    const normalized = q.toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    variants.push(q);
+  }
+
+  if (profile.kind !== "life_science") {
+    return variants;
+  }
 
   const candidates: { match: RegExp; q: string }[] = [
     { match: /trehalose|cryo|freez|thaw|dmso/, q: "trehalose cryopreservation cell viability" },
@@ -180,18 +191,12 @@ function buildQueryVariants(input: LiteratureInput, primary: string): string[] {
     { match: /cell|culture|hela/, q: "mammalian cell culture cryopreservation" },
   ];
 
-  const variants: string[] = [];
-  const seen = new Set<string>([primary.toLowerCase()]);
   for (const c of candidates) {
     if (!c.match.test(text)) continue;
     const q = c.q.toLowerCase();
     if (seen.has(q)) continue;
     seen.add(q);
     variants.push(c.q);
-  }
-  // Always end with a generic safety net so we never come up empty for bio projects.
-  if (variants.length === 0) {
-    variants.push("cell culture protocol", "cell viability assay");
   }
   return variants;
 }

@@ -12,11 +12,15 @@
 // PROTOCOLS_IO_CLIENT_TOKEN is read from process.env and never returned.
 // ============================================================
 
+import { buildAgentProfile, type AgentDomainKind } from "@/lib/agentProfile.server";
+
 const PROTOCOLS_IO_ENDPOINT = "https://www.protocols.io/api/v3/protocols";
 
 export type ProtocolsInput = {
   hypothesis?: unknown;
+  domain?: unknown;
   organism_or_system?: unknown;
+  constraints?: unknown;
   method_keywords?: unknown; // string or string[]
 };
 
@@ -25,11 +29,17 @@ export type NormalizedProtocol = {
   title: string;
   source: "protocols.io" | "curated-fallback";
   url: string;
+  doi?: string | null;
   authors: string;
   relevance_score: number;
   matched_keywords: string[];
   description: string;
   verified: boolean;
+  peer_reviewed?: boolean;
+  published_on?: number | null;
+  step_count?: number;
+  steps_preview?: string[];
+  materials?: string[];
 };
 
 export type ProtocolAttempt = {
@@ -135,7 +145,9 @@ function deriveKeywords(input: ProtocolsInput): string[] {
   const text = [
     ...fromKeywords,
     typeof input.hypothesis === "string" ? input.hypothesis : "",
+    typeof input.domain === "string" ? input.domain : "",
     typeof input.organism_or_system === "string" ? input.organism_or_system : "",
+    typeof input.constraints === "string" ? input.constraints : "",
   ].join(" ");
   const seen = new Set<string>();
   const out: string[] = [];
@@ -153,6 +165,8 @@ function buildPrimaryQuery(input: ProtocolsInput): string {
 }
 
 function buildQueryVariants(input: ProtocolsInput, primary: string): string[] {
+  const profile = buildAgentProfile(input);
+  const keywords = deriveKeywords(input);
   const keywordText = Array.isArray(input.method_keywords)
     ? input.method_keywords.filter((k): k is string => typeof k === "string").join(" ")
     : typeof input.method_keywords === "string"
@@ -161,6 +175,29 @@ function buildQueryVariants(input: ProtocolsInput, primary: string): string[] {
   const text = `${keywordText} ${typeof input.hypothesis === "string" ? input.hypothesis : ""} ${
     typeof input.organism_or_system === "string" ? input.organism_or_system : ""
   }`.toLowerCase();
+  const variants: string[] = [];
+  const seen = new Set<string>([primary.toLowerCase()]);
+  for (const q of [
+    keywords.slice(0, 2).join(" "),
+    keywords.slice(0, 3).join(" "),
+    keywords.slice(0, 4).join(" "),
+  ]) {
+    const normalized = q.toLowerCase();
+    if (!q || seen.has(normalized)) continue;
+    seen.add(normalized);
+    variants.push(q);
+  }
+  for (const q of profile.protocolQueries) {
+    const normalized = q.toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    variants.push(q);
+  }
+
+  if (profile.kind !== "life_science") {
+    return variants;
+  }
+
   const candidates: { match: RegExp; q: string }[] = [
     { match: /cryo|freez|thaw|trehalose|dmso/, q: "cell cryopreservation" },
     { match: /hela|cell|culture/, q: "HeLa cell culture" },
@@ -168,17 +205,12 @@ function buildQueryVariants(input: ProtocolsInput, primary: string): string[] {
     { match: /viability|assay|trypan|count/, q: "cell viability assay" },
     { match: /trehalose/, q: "trehalose cell freezing" },
   ];
-  const variants: string[] = [];
-  const seen = new Set<string>([primary.toLowerCase()]);
   for (const c of candidates) {
     if (!c.match.test(text)) continue;
     const q = c.q.toLowerCase();
     if (seen.has(q)) continue;
     seen.add(q);
     variants.push(c.q);
-  }
-  if (variants.length === 0) {
-    variants.push("cell culture", "cell viability assay");
   }
   for (const q of ["cell viability assay", "cell culture"]) {
     const normalized = q.toLowerCase();
@@ -192,9 +224,14 @@ function buildQueryVariants(input: ProtocolsInput, primary: string): string[] {
 
 // --------------- Curated fallback (real public URLs) ---------------
 
-const CURATED_FALLBACK: Omit<NormalizedProtocol, "relevance_score" | "matched_keywords">[] = [
+type CuratedFallbackProtocol = Omit<NormalizedProtocol, "relevance_score" | "matched_keywords"> & {
+  domainKinds: AgentDomainKind[];
+};
+
+const CURATED_FALLBACK: CuratedFallbackProtocol[] = [
   {
     id: "owt-marek-freezedown",
+    domainKinds: ["life_science"],
     title: "Mammalian cell freeze-down / thaw protocol (OpenWetWare)",
     source: "curated-fallback",
     url: "https://openwetware.org/wiki/Marek:Freeze-down/Thaw",
@@ -205,6 +242,7 @@ const CURATED_FALLBACK: Omit<NormalizedProtocol, "relevance_score" | "matched_ke
   },
   {
     id: "pio-trehalose-cryo",
+    domainKinds: ["life_science"],
     title: "Cryopreservation in trehalose (protocols.io)",
     source: "curated-fallback",
     url: "https://www.protocols.io/view/cryopreservation-of-labyrinthulomycetes-in-treh-vctw6pw",
@@ -215,6 +253,7 @@ const CURATED_FALLBACK: Omit<NormalizedProtocol, "relevance_score" | "matched_ke
   },
   {
     id: "lsi-hela-freeze",
+    domainKinds: ["life_science"],
     title: "HeLa cell freezing protocol (LSI Network)",
     source: "curated-fallback",
     url: "https://lsinetwork.com/hela-cells-freezing-protocol",
@@ -225,6 +264,7 @@ const CURATED_FALLBACK: Omit<NormalizedProtocol, "relevance_score" | "matched_ke
   },
   {
     id: "thermo-trypan-blue",
+    domainKinds: ["life_science"],
     title: "Trypan blue exclusion viability assay (Thermo Fisher)",
     source: "curated-fallback",
     url: "https://www.thermofisher.com/us/en/home/references/protocols/cell-culture/transfection-protocol/cell-viability-assay-by-trypan-blue.html",
@@ -233,10 +273,54 @@ const CURATED_FALLBACK: Omit<NormalizedProtocol, "relevance_score" | "matched_ke
       "Reference protocol for trypan blue 0.4% viability counting on a hemocytometer — standard primary readout for cryopreservation experiments.",
     verified: true,
   },
+  {
+    id: "nist-catalyst-char",
+    domainKinds: ["materials_science"],
+    title: "NIST guide to materials characterization data quality",
+    source: "curated-fallback",
+    url: "https://www.nist.gov/materials-measurement-science-division",
+    authors: "National Institute of Standards and Technology",
+    description:
+      "Reference starting point for materials measurement, calibration, and characterization quality planning.",
+    verified: true,
+  },
+  {
+    id: "ml-repro-checklist",
+    domainKinds: ["computational"],
+    title: "Machine learning reproducibility checklist",
+    source: "curated-fallback",
+    url: "https://www.cs.mcgill.ca/~jpineau/ReproducibilityChecklist.pdf",
+    authors: "Pineau et al.",
+    description:
+      "Checklist covering dataset splits, compute, hyperparameters, code, random seeds, and statistical reporting for ML experiments.",
+    verified: true,
+  },
+  {
+    id: "epa-field-qa",
+    domainKinds: ["climate_environment"],
+    title: "EPA quality assurance guidance for environmental data collection",
+    source: "curated-fallback",
+    url: "https://www.epa.gov/quality",
+    authors: "U.S. Environmental Protection Agency",
+    description:
+      "Reference hub for environmental measurement quality assurance, field sampling plans, and data quality objectives.",
+    verified: true,
+  },
+  {
+    id: "nist-engineering-measurement",
+    domainKinds: ["engineering", "general"],
+    title: "NIST engineering measurement and calibration reference",
+    source: "curated-fallback",
+    url: "https://www.nist.gov/calibrations",
+    authors: "National Institute of Standards and Technology",
+    description:
+      "Reference starting point for calibrated measurement, uncertainty, and test validation in engineering workflows.",
+    verified: true,
+  },
 ];
 
 function scoreFallback(
-  proto: Omit<NormalizedProtocol, "relevance_score" | "matched_keywords">,
+  proto: CuratedFallbackProtocol,
   keywords: string[],
 ): { score: number; matched: string[] } {
   const haystack = `${proto.title} ${proto.description}`.toLowerCase();
@@ -251,11 +335,54 @@ type PioProtocol = {
   id?: number | string;
   title?: string;
   uri?: string;
+  url?: string;
   description?: string;
   authors?: { name?: string; username?: string }[];
+  creator?: { name?: string; username?: string } | null;
   doi?: string | null;
+  peer_reviewed?: boolean | number | null;
+  published_on?: number | null;
+  materials?: { name?: string }[] | null;
+  materials_text?: string | null;
+  stats?: { number_of_steps?: number | null; number_of_votes?: number | null } | null;
 };
 type PioResponse = { items?: PioProtocol[] };
+
+type PioDetailPayload = PioProtocol & {
+  steps?: { step?: string | null; number?: string | number | null }[] | null;
+};
+type PioDetailResponse = { payload?: PioDetailPayload; status_code?: number };
+
+function compactText(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+async function fetchProtocolDetail(
+  idOrUri: string | number,
+  token: string,
+): Promise<PioDetailPayload | null> {
+  const url = `https://www.protocols.io/api/v4/protocols/${encodeURIComponent(
+    String(idOrUri),
+  )}?content_format=markdown&last_version=1`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 7000);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const json = (await res.json()) as PioDetailResponse;
+    return json.payload ?? null;
+  } catch {
+    clearTimeout(timeoutId);
+    return null;
+  }
+}
 
 async function fetchProtocolsIo(
   query: string,
@@ -263,7 +390,7 @@ async function fetchProtocolsIo(
 ): Promise<{ status: number; protocols: NormalizedProtocol[]; error: string | null }> {
   const url = `${PROTOCOLS_IO_ENDPOINT}?filter=public&key=${encodeURIComponent(
     query,
-  )}&page_size=8&page_id=1`;
+  )}&page_size=8&page_id=0`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 9000);
   try {
@@ -280,37 +407,78 @@ async function fetchProtocolsIo(
     }
     const json = (await res.json()) as PioResponse;
     const items = json.items ?? [];
-    const protocols: NormalizedProtocol[] = items
-      .filter((p) => p && p.title)
-      .slice(0, 6)
-      .map((p, idx): NormalizedProtocol => {
-        const authors =
-          (p.authors ?? [])
-            .map((a) => a.name ?? a.username ?? "")
+    const protocols: NormalizedProtocol[] = await Promise.all(
+      items
+        .filter((p) => p && p.title)
+        .slice(0, 6)
+        .map(async (p, idx): Promise<NormalizedProtocol> => {
+          const detail = await fetchProtocolDetail(p.id ?? p.uri ?? idx, token);
+          const merged = { ...p, ...(detail ?? {}) };
+          const authors =
+            (merged.authors ?? [])
+              .map((a) => a.name ?? a.username ?? "")
+              .filter(Boolean)
+              .slice(0, 3)
+              .join(", ") ||
+            merged.creator?.name ||
+            merged.creator?.username ||
+            "protocols.io contributor";
+          const protoUrl = merged.url
+            ? merged.url
+            : merged.uri
+              ? merged.uri.startsWith("http")
+                ? merged.uri
+                : `https://www.protocols.io/view/${merged.uri}`
+              : merged.doi
+                ? `https://doi.org/${merged.doi}`
+                : "";
+          const stepsPreview = (detail?.steps ?? [])
+            .map((s) => compactText(s.step ?? ""))
             .filter(Boolean)
-            .slice(0, 3)
-            .join(", ") || "protocols.io contributor";
-        const protoUrl = p.uri
-          ? p.uri.startsWith("http")
-            ? p.uri
-            : `https://www.protocols.io/view/${p.uri}`
-          : p.doi
-            ? `https://doi.org/${p.doi}`
-            : "";
-        return {
-          id: `pio-${p.id ?? idx}`,
-          title: p.title ?? "Untitled protocol",
-          source: "protocols.io",
-          url: protoUrl,
-          authors,
-          relevance_score: Math.max(0.5, 0.95 - idx * 0.08),
-          matched_keywords: [],
-          description:
-            (p.description ?? "").slice(0, 400) ||
-            "Protocol returned by protocols.io live search — review on the source page.",
-          verified: true,
-        };
-      });
+            .slice(0, 4);
+          const materials = [
+            ...(Array.isArray(merged.materials)
+              ? merged.materials.map((m) => m.name ?? "").filter(Boolean)
+              : []),
+            ...(merged.materials_text
+              ? compactText(merged.materials_text)
+                  .split(/[,;\n]/)
+                  .map((m) => compactText(m))
+                  .filter(Boolean)
+              : []),
+          ].slice(0, 12);
+          const baseDescription =
+            compactText(merged.description ?? "") ||
+            "Protocol returned by protocols.io live search — review on the source page.";
+          const detailText = [
+            baseDescription,
+            stepsPreview.length ? `Steps preview: ${stepsPreview.join(" | ")}` : "",
+            materials.length ? `Materials: ${materials.join(", ")}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n");
+          return {
+            id: `pio-${merged.id ?? idx}`,
+            title: merged.title ?? "Untitled protocol",
+            source: "protocols.io",
+            url: protoUrl,
+            doi: merged.doi ?? null,
+            authors,
+            relevance_score: Math.max(0.5, 0.95 - idx * 0.08),
+            matched_keywords: [],
+            description: detailText.slice(0, 1200),
+            verified: true,
+            peer_reviewed: Boolean(merged.peer_reviewed),
+            published_on: merged.published_on ?? null,
+            step_count:
+              detail?.steps?.length ??
+              merged.stats?.number_of_steps ??
+              (stepsPreview.length ? stepsPreview.length : undefined),
+            steps_preview: stepsPreview,
+            materials,
+          };
+        }),
+    );
     return { status: res.status, protocols, error: null };
   } catch (err) {
     clearTimeout(timeoutId);
@@ -339,9 +507,10 @@ function dedupe(protocols: NormalizedProtocol[]): NormalizedProtocol[] {
 export async function runProtocolsSearch(input: ProtocolsInput): Promise<ProtocolResult> {
   const token = process.env.PROTOCOLS_IO_CLIENT_TOKEN;
   const hasProtocolsIoToken = Boolean(token);
+  const profile = buildAgentProfile(input);
 
   const keywords = deriveKeywords(input);
-  const primary = buildPrimaryQuery(input) || "cell culture protocol";
+  const primary = buildPrimaryQuery(input) || profile.protocolQueries[0] || "research protocol";
   const variants = buildQueryVariants(input, primary);
   const allQueries = [primary, ...variants];
 
@@ -395,10 +564,16 @@ export async function runProtocolsSearch(input: ProtocolsInput): Promise<Protoco
   }
 
   // Curated fallback
-  const scored = CURATED_FALLBACK.map((p) => {
-    const { score, matched } = scoreFallback(p, keywords);
-    return { ...p, relevance_score: score, matched_keywords: matched };
-  }).sort((a, b) => b.relevance_score - a.relevance_score);
+  const domainFallbacks = CURATED_FALLBACK.filter(
+    (p) => p.domainKinds.includes(profile.kind) || p.domainKinds.includes("general"),
+  );
+  const scored = (domainFallbacks.length ? domainFallbacks : CURATED_FALLBACK)
+    .map((p) => {
+      const { score, matched } = scoreFallback(p, keywords);
+      const { domainKinds: _domainKinds, ...protocol } = p;
+      return { ...protocol, relevance_score: score, matched_keywords: matched };
+    })
+    .sort((a, b) => b.relevance_score - a.relevance_score);
 
   return {
     data: scored,

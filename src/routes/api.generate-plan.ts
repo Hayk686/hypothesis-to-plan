@@ -30,6 +30,7 @@ import {
   type LlmPlan,
   type LlmProjectInput,
 } from "@/lib/llm.server";
+import { buildAgentProfile, type AgentProfile } from "@/lib/agentProfile.server";
 import type { LlmFeedbackCorrection, ScientistFeedbackSection } from "@/lib/scientistFeedback";
 
 const CORS_HEADERS = {
@@ -104,7 +105,7 @@ function normalizeScientistFeedback(v: unknown): LlmFeedbackCorrection[] {
     .slice(0, 6);
 }
 
-function buildTimeline(weeks: number) {
+function buildTimeline(weeks: number, profile: AgentProfile) {
   const target = Math.max(4, Math.min(16, Math.round(weeks)));
   const phases = [
     {
@@ -157,13 +158,18 @@ function buildTimeline(weeks: number) {
     },
   ];
   return Array.from({ length: target }, (_, i) => {
-    const src = phases[Math.min(phases.length - 1, Math.floor((i / target) * phases.length))];
+    const activePhases = profile.timelinePhases.length ? profile.timelinePhases : phases;
+    const src =
+      activePhases[
+        Math.min(activePhases.length - 1, Math.floor((i / target) * activePhases.length))
+      ];
     return { week: i + 1, ...src };
   });
 }
 
-function defaultRisks() {
+function defaultRisks(profile: AgentProfile) {
   return [
+    ...profile.risks,
     {
       id: "r1",
       title: "Effect size smaller than expected",
@@ -183,22 +189,82 @@ function defaultRisks() {
     },
     {
       id: "r3",
-      title: "Reagent backorder delays the experiment",
+      title: "Critical resource is unavailable on schedule",
       category: "operational",
       likelihood: "low",
       impact: "medium",
-      mitigation: "Order reagents in week 1 and identify a second supplier per critical SKU.",
+      mitigation:
+        "Confirm access in week 1 and identify an alternate vendor, dataset, instrument, or compute path.",
     },
     {
       id: "r4",
-      title: "Budget overrun on consumables",
+      title: "Budget overrun on required resources",
       category: "budget",
       likelihood: "medium",
       impact: "low",
       mitigation:
-        "Confirm current vendor prices in week 1; drop one biological replicate before skipping controls.",
+        "Confirm current prices and prioritize controls or benchmark runs before optional scope.",
     },
-  ];
+  ].slice(0, 5);
+}
+
+function fallbackValidationPlan(profile: AgentProfile) {
+  const v = profile.validation;
+  return {
+    primary_metric: {
+      name: v.primaryMetricName,
+      target: v.primaryMetricTarget,
+      method: v.primaryMetricMethod,
+    },
+    secondary_metrics: v.secondaryMetrics.map((m) => ({
+      name: m.name,
+      target: m.target,
+      method: m.method,
+    })),
+    statistical_approach: v.statisticalApproach,
+    reproducibility_checks: v.reproducibilityChecks,
+    positive_control: v.positiveControl,
+    negative_control: v.negativeControl,
+  };
+}
+
+function adaptValidationPlanToProfile(
+  plan: ReturnType<typeof fallbackValidationPlan>,
+  profile: AgentProfile,
+) {
+  const fallback = fallbackValidationPlan(profile);
+  const primaryName = plan.primary_metric.name.toLowerCase();
+  const primaryMethod = plan.primary_metric.method.toLowerCase();
+  const positive = plan.positive_control.toLowerCase();
+  const negative = plan.negative_control.toLowerCase();
+  const genericPrimary =
+    /^(primary endpoint|primary metric|pre-registered primary endpoint)$/.test(primaryName) ||
+    (profile.kind !== "life_science" && /biological|assay|endpoint/.test(primaryName));
+  const wetLabMethod =
+    profile.kind !== "life_science" && /assay|cell|culture|sample viability/.test(primaryMethod);
+  const wetLabControls =
+    profile.kind !== "life_science" &&
+    /vehicle|untreated|non-perturbed|same batch/.test(`${positive} ${negative}`);
+
+  return {
+    ...plan,
+    primary_metric:
+      genericPrimary || wetLabMethod
+        ? fallback.primary_metric
+        : {
+            ...plan.primary_metric,
+            method: wetLabMethod ? fallback.primary_metric.method : plan.primary_metric.method,
+          },
+    secondary_metrics:
+      plan.secondary_metrics.length > 0 ? plan.secondary_metrics : fallback.secondary_metrics,
+    statistical_approach: plan.statistical_approach || fallback.statistical_approach,
+    reproducibility_checks:
+      plan.reproducibility_checks.length > 0
+        ? plan.reproducibility_checks
+        : fallback.reproducibility_checks,
+    positive_control: wetLabControls ? fallback.positive_control : plan.positive_control,
+    negative_control: wetLabControls ? fallback.negative_control : plan.negative_control,
+  };
 }
 
 export const Route = createFileRoute("/api/generate-plan")({
@@ -226,6 +292,13 @@ export const Route = createFileRoute("/api/generate-plan")({
         const weeks = safeNum(project.timelineWeeks, 6);
         const scientistFeedback = normalizeScientistFeedback(project.scientist_feedback);
         const experimentType = safeStr(project.experiment_type, `${organism || domain}`);
+        const agentProfile = buildAgentProfile({
+          hypothesis,
+          domain,
+          organism_or_system: organism,
+          constraints,
+          method_keywords: project.method_keywords,
+        });
 
         const project_summary = {
           title: safeStr(project.title, "Untitled experiment"),
@@ -247,7 +320,9 @@ export const Route = createFileRoute("/api/generate-plan")({
           runLiteratureSearch({ hypothesis, domain, organism_or_system: organism, constraints }),
           runProtocolsSearch({
             hypothesis,
+            domain,
             organism_or_system: organism,
+            constraints,
             method_keywords: project.method_keywords,
           }),
         ]);
@@ -268,10 +343,16 @@ export const Route = createFileRoute("/api/generate-plan")({
           ? project.required_materials.filter((m): m is string => typeof m === "string")
           : [];
         const required_materials =
-          explicitRequiredMaterials.length > 0 ? explicitRequiredMaterials : llmRequiredMaterials;
+          explicitRequiredMaterials.length > 0
+            ? explicitRequiredMaterials
+            : llmRequiredMaterials.length > 0
+              ? llmRequiredMaterials
+              : agentProfile.defaultMaterials;
         const mat = runMaterialsResolver({
           organism_or_system: organism,
           assay_type: domain,
+          domain,
+          constraints,
           required_materials,
           protocol_steps: protocols.map((p) => ({
             description: `${p.title}. ${p.description}`,
@@ -344,10 +425,7 @@ export const Route = createFileRoute("/api/generate-plan")({
             } else {
               if (!m.catalog || m.catalog === "VERIFY_REQUIRED") item -= perItem * 0.5;
               const url = m.source_url ?? "";
-              const hasSpecificUrl =
-                /sigmaaldrich\.com|thermofisher\.com|fishersci\.com|gibco|milliporesigma|neb\.com|bio-rad|abcam/i.test(
-                  url,
-                );
+              const hasSpecificUrl = agentProfile.supplierUrlPattern.test(url);
               if (!url) item -= perItem * 0.4;
               else if (!hasSpecificUrl) item -= perItem * 0.2; // generic vendor
             }
@@ -387,42 +465,20 @@ export const Route = createFileRoute("/api/generate-plan")({
           venue: p.venue,
         }));
 
-        const fallback_validation_plan = {
-          primary_metric: {
-            name: "Pre-registered primary endpoint derived from the hypothesis",
-            target: "Defined effect size with one-sided test at α = 0.05",
-            method: "Direct measurement of the dependent variable in the hypothesis",
-          },
-          secondary_metrics: [
-            {
-              name: "Time-course readouts",
-              target: "Trend consistent with primary",
-              method: "Same assay at later time points",
-            },
-          ],
-          statistical_approach:
-            "Pre-registered Welch's t-test with α = 0.05, n powered to detect the stated effect size; report point estimate and 95% CI.",
-          reproducibility_checks: [
-            "Pre-register the endpoint and analysis script",
-            "Independent re-count / re-measurement of a random ≥25% subset",
-            "Publish raw data and analysis script",
-          ],
-          positive_control: "Untreated / non-perturbed sample from the same batch",
-          negative_control: "Vehicle-only or assay-floor condition",
-        };
-        const validation_plan = llmPlan?.validation_plan ?? fallback_validation_plan;
+        const fallback_validation_plan = fallbackValidationPlan(agentProfile);
+        const validation_plan = adaptValidationPlanToProfile(
+          llmPlan?.validation_plan ?? fallback_validation_plan,
+          agentProfile,
+        );
 
-        const fallback_scientist_review_questions = [
-          "Is the pre-registered effect size realistic given the published baselines?",
-          "Are the verified catalog numbers still in stock at the assumed prices?",
-          "Does the primary protocol need adaptation for this organism / assay?",
-          "Are the proposed controls sufficient to rule out the top two confounders?",
-        ];
+        const fallback_scientist_review_questions = agentProfile.reviewQuestions;
         let scientist_review_questions = llmPlan?.scientist_review_questions.length
           ? llmPlan.scientist_review_questions
           : fallback_scientist_review_questions;
 
-        const timeline = llmPlan?.timeline.length ? llmPlan.timeline : buildTimeline(weeks);
+        const timeline = llmPlan?.timeline.length
+          ? llmPlan.timeline
+          : buildTimeline(weeks, agentProfile);
         if (scientistFeedback.length > 0) {
           const feedbackQuestions = scientistFeedback.map(
             (f) => `Prior scientist correction (${f.section}): ${f.corrected_value}`,
@@ -451,7 +507,7 @@ export const Route = createFileRoute("/api/generate-plan")({
             }
           }
         }
-        const risks = llmPlan?.risks.length ? llmPlan.risks : defaultRisks();
+        const risks = llmPlan?.risks.length ? llmPlan.risks : defaultRisks(agentProfile);
         const judge_presentation_view = {
           headline: llmPlan?.judge_presentation_view.headline ?? project_summary.title,
           one_line_pitch:
@@ -525,7 +581,7 @@ export const Route = createFileRoute("/api/generate-plan")({
         };
 
         const debug = {
-          orchestrator: { evidenceWeak, usedFallback },
+          orchestrator: { evidenceWeak, usedFallback, agentProfile: agentProfile.kind },
           literature: litDebug,
           protocols: protoDebug,
           materials: matDebug,
