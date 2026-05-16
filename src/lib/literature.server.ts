@@ -190,6 +190,12 @@ function buildQueryVariants(input: LiteratureInput, primary: string): string[] {
     addVariant("PM2.5 low cost sensor drift compensation");
     addVariant("air quality sensor calibration reference monitor");
   }
+  if (/soil.?moisture|soil.?water|volumetric water|vwc|field crop|irrigation/.test(text)) {
+    addVariant("soil moisture sensor calibration manufacturer equation field");
+    addVariant("site specific calibration soil moisture sensors accuracy");
+    addVariant("soil water sensor factory calibration field correction");
+    addVariant("volumetric water content sensor site specific calibration");
+  }
   for (const q of profile.literatureQueries) {
     addVariant(q);
   }
@@ -415,15 +421,43 @@ function dedupeMerge(existing: NormalizedPaper[], incoming: NormalizedPaper[]): 
   return out;
 }
 
-function rerank(papers: NormalizedPaper[]): NormalizedPaper[] {
-  // Re-sort merged set by citation count then existing relevance, then re-tag roles.
-  const sorted = [...papers].sort((a, b) => {
-    if (b.citation_count !== a.citation_count) return b.citation_count - a.citation_count;
-    return b.relevance_score - a.relevance_score;
+function lexicalScore(paper: NormalizedPaper, queryTokens: string[]): number {
+  const title = paper.title.toLowerCase();
+  const abstract = paper.abstract.toLowerCase();
+  let score = 0;
+  for (const t of queryTokens) {
+    if (title.includes(t)) score += 2;
+    else if (abstract.includes(t)) score += 1;
+  }
+  return queryTokens.length ? score / (queryTokens.length * 2) : 0;
+}
+
+function rerank(papers: NormalizedPaper[], queries: string[]): NormalizedPaper[] {
+  const queryTokens = Array.from(
+    new Set(tokens(queries.join(" ")).filter((t) => !["study", "field", "effect"].includes(t))),
+  ).slice(0, 16);
+  const scored = papers.map((p) => ({
+    paper: p,
+    lexical: lexicalScore(p, queryTokens),
+  }));
+  const relevant = scored.filter((row) => row.lexical >= 0.08);
+  const pool = relevant.length > 0 ? relevant : scored;
+  const sorted = [...pool].sort((a, b) => {
+    if (b.lexical !== a.lexical) return b.lexical - a.lexical;
+    if (b.paper.citation_count !== a.paper.citation_count) {
+      return b.paper.citation_count - a.paper.citation_count;
+    }
+    return b.paper.relevance_score - a.paper.relevance_score;
   });
-  return sorted.slice(0, 10).map((p, idx) => ({
-    ...p,
-    relevance_score: relevanceScore(idx, p.citation_count),
+  return sorted.slice(0, 10).map(({ paper, lexical }, idx) => ({
+    ...paper,
+    relevance_score: Math.max(
+      0.1,
+      Math.min(
+        1,
+        Math.round((lexical * 0.75 + relevanceScore(idx, paper.citation_count) * 0.25) * 100) / 100,
+      ),
+    ),
     evidence_role: evidenceRole(idx),
   }));
 }
@@ -479,7 +513,7 @@ export async function runLiteratureSearch(input: LiteratureInput): Promise<Liter
     if (pm.papers.length > 0) papers = dedupeMerge(papers, pm.papers);
   }
 
-  papers = rerank(papers);
+  papers = rerank(papers, allQueries);
 
   const usedFallback = papers.length < SUCCESS_THRESHOLD;
   const sourcesPresent = new Set(papers.map((p) => p.source));
