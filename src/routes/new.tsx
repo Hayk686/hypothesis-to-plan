@@ -72,6 +72,8 @@ type LiveQcResponse = {
     source?: "semantic-scholar" | "pubmed" | "merged" | "none";
     used_fallback?: boolean;
     primaryQuery?: string;
+    resultCount?: number;
+    errors?: string[];
     attempts?: {
       source_name: "semantic-scholar" | "pubmed";
       query: string;
@@ -86,7 +88,9 @@ type LiveQcDiagnostics = {
   elapsedMs: number;
   attemptCount: number;
   queries: string[];
+  errors: string[];
   source: string;
+  status: "verified" | "weak" | "unavailable";
   weakEvidence: boolean;
 };
 
@@ -119,18 +123,50 @@ async function runLiveLiteratureQc(project: Project): Promise<{
   sourceLabel: string;
   diagnostics: LiveQcDiagnostics;
 }> {
+  const MIN_VISIBLE_QC_MS = 1200;
   const startedAt = performance.now();
-  const res = await fetch("/api/search-literature", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({
-      hypothesis: project.hypothesis,
-      domain: project.domain,
-      organism_or_system: project.organism,
-      constraints: project.constraints,
-    }),
-  });
+  const waitForMinimumVisibleTime = async () => {
+    const elapsed = performance.now() - startedAt;
+    if (elapsed < MIN_VISIBLE_QC_MS) {
+      await new Promise((resolve) => setTimeout(resolve, MIN_VISIBLE_QC_MS - elapsed));
+    }
+  };
+
+  let res: Response;
+  try {
+    res = await fetch("/api/search-literature", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        hypothesis: project.hypothesis,
+        domain: project.domain,
+        organism_or_system: project.organism,
+        constraints: project.constraints,
+      }),
+    });
+  } catch (err) {
+    await waitForMinimumVisibleTime();
+    return {
+      papers: [],
+      literatureQc: {
+        result: "Live literature check unavailable",
+        reason: `Literature QC could not reach the search endpoint. ${err instanceof Error ? err.message : "Network request failed."}`,
+      },
+      sourceLabel: "Live QC unavailable",
+      diagnostics: {
+        elapsedMs: Math.round(performance.now() - startedAt),
+        attemptCount: 0,
+        queries: [],
+        errors: [err instanceof Error ? err.message : "Network request failed."],
+        source: "unavailable",
+        status: "unavailable",
+        weakEvidence: true,
+      },
+    };
+  }
+
   if (!res.ok) {
+    await waitForMinimumVisibleTime();
     return {
       papers: [],
       literatureQc: {
@@ -142,7 +178,9 @@ async function runLiveLiteratureQc(project: Project): Promise<{
         elapsedMs: Math.round(performance.now() - startedAt),
         attemptCount: 0,
         queries: [],
+        errors: [`HTTP ${res.status}`],
         source: "unavailable",
+        status: "unavailable",
         weakEvidence: true,
       },
     };
@@ -153,6 +191,16 @@ async function runLiveLiteratureQc(project: Project): Promise<{
   const debug = json.debug;
   const attempts = debug?.attempts ?? [];
   const count = papers.length;
+  const hasTransportAttempts = attempts.length > 0;
+  const allAttemptsFailed =
+    hasTransportAttempts &&
+    attempts.every((a) => a.status_code === 0 || a.status_code >= 400 || Boolean(a.error_message));
+  const status: LiveQcDiagnostics["status"] =
+    allAttemptsFailed && count === 0
+      ? "unavailable"
+      : count >= 3 && !debug?.used_fallback
+        ? "verified"
+        : "weak";
   const sourceLabel =
     debug?.source === "merged"
       ? "Live Semantic Scholar + PubMed"
@@ -163,20 +211,25 @@ async function runLiveLiteratureQc(project: Project): Promise<{
           : "Live literature search";
 
   const result =
-    count === 0
-      ? "No live references found"
-      : count <= 2 || debug?.used_fallback
-        ? "Limited similar work found"
-        : "Similar work exists";
+    status === "unavailable"
+      ? "Live literature check unavailable"
+      : count === 0
+        ? "No live references found"
+        : count <= 2 || debug?.used_fallback
+          ? "Limited similar work found"
+          : "Similar work exists";
   const attemptsText =
     attempts.length > 0
       ? ` after ${attempts.length} live query attempt${attempts.length === 1 ? "" : "s"}`
       : "";
   const reason =
-    count === 0
-      ? `No relevant papers returned${attemptsText} for "${debug?.primaryQuery ?? project.hypothesis.slice(0, 120)}". This is not proof of novelty; it means the automated search did not find usable references.`
-      : `Returned ${count} live reference${count === 1 ? "" : "s"} for this exact project context via ${sourceLabel}.`;
+    status === "unavailable"
+      ? `Literature QC ran, but all live source attempts failed. ${debug?.errors?.[0] ?? "Check API keys, network access, or upstream API availability."}`
+      : count === 0
+        ? `No relevant papers returned${attemptsText} for "${debug?.primaryQuery ?? project.hypothesis.slice(0, 120)}". This is not proof of novelty; it means the automated search did not find usable references.`
+        : `Returned ${count} live reference${count === 1 ? "" : "s"} for this exact project context via ${sourceLabel}.`;
 
+  await waitForMinimumVisibleTime();
   return {
     papers,
     literatureQc: { result, reason },
@@ -188,8 +241,12 @@ async function runLiveLiteratureQc(project: Project): Promise<{
         .map((a) => a.query)
         .filter(Boolean)
         .slice(0, 6),
+      errors: [...(debug?.errors ?? []), ...attempts.map((a) => a.error_message).filter(Boolean)]
+        .filter((e, idx, arr): e is string => typeof e === "string" && arr.indexOf(e) === idx)
+        .slice(0, 4),
       source: debug?.source ?? "none",
-      weakEvidence: count < 3 || Boolean(debug?.used_fallback),
+      status,
+      weakEvidence: status !== "verified",
     },
   };
 }
@@ -577,6 +634,18 @@ function NewProjectPage() {
                       <Badge key={q} variant="outline" className="max-w-full text-[10px]">
                         {q}
                       </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {qcDiagnostics?.errors.length ? (
+                <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-destructive">
+                    Source errors
+                  </div>
+                  <div className="mt-1 space-y-1 text-xs text-foreground/80">
+                    {qcDiagnostics.errors.map((err) => (
+                      <div key={err}>{err}</div>
                     ))}
                   </div>
                 </div>
