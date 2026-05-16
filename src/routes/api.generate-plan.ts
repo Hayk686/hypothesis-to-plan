@@ -582,7 +582,7 @@ export const Route = createFileRoute("/api/generate-plan")({
                 : matDebug.unmatchedCount > 0
                   ? "partial"
                   : "full",
-            reason: `${matDebug.matchedCount} supplier-verified / ${matDebug.unmatchedCount} requiring vendor SKU; Mouser ${matDebug.mouserMatchedCount}, PubChem identity ${matDebug.pubchemMatchedCount}.`,
+            reason: `${matDebug.matchedCount} supplier-verified / ${matDebug.unmatchedCount} requiring vendor SKU; Mouser ${matDebug.mouserMatchedCount}, Nexar ${matDebug.nexarMatchedCount}, PubChem identity ${matDebug.pubchemMatchedCount}.`,
           },
           llm: {
             label: llmDebug.used_fallback

@@ -28,6 +28,8 @@ CROSSREF_MAILTO=
 NCBI_API_KEY=
 PROTOCOLS_IO_CLIENT_TOKEN=
 MOUSER_API_KEY=
+NEXAR_CLIENT_ID=
+NEXAR_CLIENT_SECRET=
 LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=liquid/lfm-2.5-1.2b-instruct:free
@@ -59,5 +61,5 @@ NVIDIA_MODEL=openai/gpt-oss-20b
 - Open a generated project and verify source badges:
   - Semantic Scholar, OpenAlex, Crossref, or PubMed for literature
   - protocols.io or explicit curated fallback for protocols
-  - verified supplier registry, Mouser, or PubChem identity records for materials
+  - verified supplier registry, Mouser, Nexar/Octopart, or PubChem identity records for materials
   - OpenRouter/NVIDIA or deterministic fallback for LLM

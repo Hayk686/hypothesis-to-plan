@@ -5,13 +5,16 @@
 // Resolution order:
 //   1. Curated verified supplier registry.
 //   2. Mouser Search API for electronics/sensors/components (optional key).
-//   3. PubChem PUG REST for chemical identity validation (free, no key).
+//   3. Nexar/Octopart GraphQL for electronics/sensors/components (optional keys).
+//   4. PubChem PUG REST for chemical identity validation (free, no key).
 // Items without a supplier SKU remain verify-required.
 // ============================================================
 
 const PUBCHEM_PROPERTY_ENDPOINT = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name";
 const PUBCHEM_SUMMARY_ENDPOINT = "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound";
 const MOUSER_KEYWORD_ENDPOINT = "https://api.mouser.com/api/v1.0/search/keyword";
+const NEXAR_TOKEN_ENDPOINT = "https://identity.nexar.com/connect/token";
+const NEXAR_GRAPHQL_ENDPOINT = "https://api.nexar.com/graphql";
 const EXTERNAL_LOOKUP_LIMIT = 6;
 
 export type ResolveInput = {
@@ -23,7 +26,12 @@ export type ResolveInput = {
   required_materials?: unknown;
 };
 
-export type MaterialSource = "verified-supplier-registry" | "mouser" | "pubchem" | "unverified";
+export type MaterialSource =
+  | "verified-supplier-registry"
+  | "mouser"
+  | "nexar"
+  | "pubchem"
+  | "unverified";
 
 export type NormalizedMaterial = {
   name: string;
@@ -41,7 +49,7 @@ export type NormalizedMaterial = {
 };
 
 export type ResolveAttempt = {
-  source_name: "mouser" | "pubchem";
+  source_name: "mouser" | "nexar" | "pubchem";
   query: string;
   status_code: number;
   result_count: number;
@@ -52,9 +60,11 @@ export type ResolveDebug = {
   proxyUsed: true;
   registrySize: number;
   hasMouserApiKey: boolean;
+  hasNexarCredentials: boolean;
   requestedTerms: string[];
   matchedCount: number;
   mouserMatchedCount: number;
+  nexarMatchedCount: number;
   pubchemMatchedCount: number;
   unmatchedCount: number;
   source: "verified-supplier-registry" | "live-supplier-apis" | "mixed";
@@ -338,6 +348,183 @@ async function fetchMouserMaterial(
   }
 }
 
+type NexarCredentials = { clientId?: string; clientSecret?: string };
+type NexarTokenCache = { accessToken: string; expiresAt: number };
+let nexarTokenCache: NexarTokenCache | null = null;
+
+type NexarPrice = { price?: number; currency?: string; quantity?: number };
+type NexarOffer = {
+  sku?: string | null;
+  clickUrl?: string | null;
+  inventoryLevel?: number | null;
+  prices?: NexarPrice[] | null;
+};
+type NexarSeller = {
+  company?: { name?: string | null } | null;
+  offers?: NexarOffer[] | null;
+};
+type NexarPart = {
+  mpn?: string | null;
+  octopartUrl?: string | null;
+  shortDescription?: string | null;
+  manufacturer?: { name?: string | null } | null;
+  sellers?: NexarSeller[] | null;
+};
+type NexarSearchResponse = {
+  data?: {
+    supSearch?: {
+      results?: Array<{ part?: NexarPart | null }> | null;
+    } | null;
+  };
+  errors?: Array<{ message?: string }>;
+};
+
+async function getNexarAccessToken(
+  credentials: NexarCredentials,
+): Promise<{ status: number; accessToken: string | null; error: string | null }> {
+  if (!credentials.clientId || !credentials.clientSecret) {
+    return { status: 0, accessToken: null, error: "Nexar credentials missing" };
+  }
+  if (nexarTokenCache && nexarTokenCache.expiresAt > Date.now() + 60_000) {
+    return { status: 200, accessToken: nexarTokenCache.accessToken, error: null };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(process.env.NEXAR_TOKEN_URL ?? NEXAR_TOKEN_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      signal: controller.signal,
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: credentials.clientId,
+        client_secret: credentials.clientSecret,
+        scope: "supply.domain",
+      }),
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok)
+      return { status: res.status, accessToken: null, error: `Nexar auth HTTP ${res.status}` };
+    const json = (await res.json()) as { access_token?: string; expires_in?: number };
+    if (!json.access_token)
+      return { status: res.status, accessToken: null, error: "Nexar auth missing access_token" };
+    nexarTokenCache = {
+      accessToken: json.access_token,
+      expiresAt: Date.now() + Math.max(60, json.expires_in ?? 3600) * 1000,
+    };
+    return { status: res.status, accessToken: json.access_token, error: null };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    return {
+      status: 0,
+      accessToken: null,
+      error: err instanceof Error ? err.message : "Nexar auth failed",
+    };
+  }
+}
+
+function bestNexarOffer(part: NexarPart): { seller: string; offer: NexarOffer } | null {
+  for (const seller of part.sellers ?? []) {
+    for (const offer of seller.offers ?? []) {
+      if (offer.sku || offer.clickUrl) {
+        return { seller: seller.company?.name ?? "Octopart supplier", offer };
+      }
+    }
+  }
+  return null;
+}
+
+async function fetchNexarMaterial(
+  term: string,
+  credentials: NexarCredentials,
+): Promise<{ status: number; material: NormalizedMaterial | null; error: string | null }> {
+  const token = await getNexarAccessToken(credentials);
+  if (!token.accessToken) return { status: token.status, material: null, error: token.error };
+
+  const query = compactQuery(term);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 9000);
+  try {
+    const res = await fetch(process.env.NEXAR_GRAPHQL_URL ?? NEXAR_GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token.accessToken}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        query: `
+          query SupplierSearch($q: String!) {
+            supSearch(q: $q, limit: 5) {
+              results {
+                part {
+                  mpn
+                  octopartUrl
+                  shortDescription
+                  manufacturer { name }
+                  sellers {
+                    company { name }
+                    offers {
+                      sku
+                      clickUrl
+                      inventoryLevel
+                      prices { quantity price currency }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `,
+        variables: { q: query },
+      }),
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) return { status: res.status, material: null, error: `Nexar HTTP ${res.status}` };
+    const json = (await res.json()) as NexarSearchResponse;
+    if (json.errors?.length) {
+      return {
+        status: res.status,
+        material: null,
+        error: json.errors[0]?.message ?? "Nexar GraphQL error",
+      };
+    }
+    const part = json.data?.supSearch?.results
+      ?.map((r) => r.part)
+      .find((p): p is NexarPart => Boolean(p?.mpn));
+    if (!part) return { status: res.status, material: null, error: null };
+    const match = bestNexarOffer(part);
+    const price = match?.offer.prices?.[0];
+    return {
+      status: res.status,
+      material: {
+        name: term,
+        matched_term: term,
+        supplier: match?.seller ?? "Octopart / Nexar",
+        product: part.shortDescription ?? part.mpn ?? term,
+        catalog: match?.offer.sku ?? part.mpn ?? "VERIFY_REQUIRED",
+        category: /sensor|module|board|meter|logger|probe/i.test(term) ? "equipment" : "consumable",
+        source_url: match?.offer.clickUrl ?? part.octopartUrl ?? "",
+        unit_cost: typeof price?.price === "number" ? price.price : 0,
+        pack_size: price?.quantity ? `quantity ${price.quantity}` : "1 item",
+        verified: Boolean(match?.offer.sku || match?.offer.clickUrl || part.octopartUrl),
+        source: "nexar",
+        note: `Live Nexar/Octopart supplier result${part.manufacturer?.name ? ` - manufacturer: ${part.manufacturer.name}` : ""}${typeof match?.offer.inventoryLevel === "number" ? ` - inventory: ${match.offer.inventoryLevel}` : ""}. Confirm compatibility before ordering.`,
+      },
+      error: null,
+    };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    return {
+      status: 0,
+      material: null,
+      error: err instanceof Error ? err.message : "Nexar fetch failed",
+    };
+  }
+}
+
 type PubChemProperty = {
   PropertyTable?: {
     Properties?: Array<{
@@ -423,8 +610,13 @@ export async function runMaterialsResolver(input: ResolveInput): Promise<Resolve
   const attempts: ResolveAttempt[] = [];
   const errors: string[] = [];
   const mouserKey = process.env.MOUSER_API_KEY;
+  const nexarCredentials = {
+    clientId: process.env.NEXAR_CLIENT_ID,
+    clientSecret: process.env.NEXAR_CLIENT_SECRET,
+  };
   let verifyRequired = 0;
   let mouserMatched = 0;
+  let nexarMatched = 0;
   let pubchemMatched = 0;
   let externalLookups = 0;
 
@@ -470,6 +662,23 @@ export async function runMaterialsResolver(input: ResolveInput): Promise<Resolve
       }
     }
 
+    if (!resolved && externalLookups < EXTERNAL_LOOKUP_LIMIT && shouldTryMouser(term)) {
+      externalLookups += 1;
+      const r = await fetchNexarMaterial(term, nexarCredentials);
+      attempts.push({
+        source_name: "nexar",
+        query: compactQuery(term),
+        status_code: r.status,
+        result_count: r.material ? 1 : 0,
+        error_message: r.error,
+      });
+      if (r.error && r.error !== "Nexar credentials missing") errors.push(r.error);
+      if (r.material) {
+        resolved = r.material;
+        nexarMatched += 1;
+      }
+    }
+
     if (!resolved && externalLookups < EXTERNAL_LOOKUP_LIMIT && shouldTryPubChem(term)) {
       externalLookups += 1;
       const r = await fetchPubChemMaterial(term);
@@ -497,7 +706,7 @@ export async function runMaterialsResolver(input: ResolveInput): Promise<Resolve
   }
 
   const matchedCount = materials.filter((m) => m.verified).length;
-  const liveCount = mouserMatched + pubchemMatched;
+  const liveCount = mouserMatched + nexarMatched + pubchemMatched;
 
   return {
     data: materials,
@@ -505,9 +714,11 @@ export async function runMaterialsResolver(input: ResolveInput): Promise<Resolve
       proxyUsed: true,
       registrySize: REGISTRY.length,
       hasMouserApiKey: Boolean(mouserKey),
+      hasNexarCredentials: Boolean(nexarCredentials.clientId && nexarCredentials.clientSecret),
       requestedTerms: terms,
       matchedCount,
       mouserMatchedCount: mouserMatched,
+      nexarMatchedCount: nexarMatched,
       pubchemMatchedCount: pubchemMatched,
       unmatchedCount: verifyRequired,
       source:

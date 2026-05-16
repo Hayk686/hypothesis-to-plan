@@ -4,6 +4,7 @@ import { runMaterialsResolver } from "./materials.server";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe("runMaterialsResolver", () => {
@@ -77,5 +78,60 @@ describe("runMaterialsResolver", () => {
       verified: false,
     });
     expect(material?.catalog).toMatch(/^CID:/);
+  });
+
+  it("uses Nexar/Octopart as an electronics supplier fallback", async () => {
+    vi.stubEnv("NEXAR_CLIENT_ID", "client-id");
+    vi.stubEnv("NEXAR_CLIENT_SECRET", "client-secret");
+    const fetchMock = vi.fn(async (url: string | URL | Request) => {
+      const href = String(url);
+      if (href.includes("identity.nexar.com")) {
+        return Response.json({ access_token: "token", expires_in: 3600 });
+      }
+      return Response.json({
+        data: {
+          supSearch: {
+            results: [
+              {
+                part: {
+                  mpn: "SEN-13322",
+                  octopartUrl: "https://octopart.com/sen-13322",
+                  shortDescription: "Soil moisture sensor module",
+                  manufacturer: { name: "Generic" },
+                  sellers: [
+                    {
+                      company: { name: "Example Distributor" },
+                      offers: [
+                        {
+                          sku: "SKU-13322",
+                          clickUrl: "https://example.com/sku-13322",
+                          inventoryLevel: 42,
+                          prices: [{ quantity: 1, price: 7.5, currency: "USD" }],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await runMaterialsResolver({
+      required_materials: ["soil moisture sensor module"],
+    });
+
+    const material = result.data.find((m) => m.name === "soil moisture sensor module");
+    expect(result.debug.nexarMatchedCount).toBe(1);
+    expect(material).toMatchObject({
+      source: "nexar",
+      verified: true,
+      supplier: "Example Distributor",
+      catalog: "SKU-13322",
+      unit_cost: 7.5,
+    });
   });
 });
