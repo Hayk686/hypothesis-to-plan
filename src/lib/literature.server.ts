@@ -171,11 +171,27 @@ function buildQueryVariants(input: LiteratureInput, primary: string): string[] {
 
   const variants: string[] = [];
   const seen = new Set<string>([primary.toLowerCase()]);
-  for (const q of profile.literatureQueries) {
-    const normalized = q.toLowerCase();
-    if (seen.has(normalized)) continue;
+  const addVariant = (q: string) => {
+    const normalized = q.trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) return;
     seen.add(normalized);
-    variants.push(q);
+    variants.push(q.trim());
+  };
+  const keywordTokens = tokens(text);
+  for (const q of [
+    keywordTokens.slice(0, 3).join(" "),
+    keywordTokens.slice(0, 4).join(" "),
+    keywordTokens.slice(0, 5).join(" "),
+  ]) {
+    addVariant(q);
+  }
+  if (/pm2|pm2\.5|air.?quality|particulate|low.?cost.*sensor|sensor.*drift/.test(text)) {
+    addVariant("low cost air quality sensor calibration temperature humidity correction");
+    addVariant("PM2.5 low cost sensor drift compensation");
+    addVariant("air quality sensor calibration reference monitor");
+  }
+  for (const q of profile.literatureQueries) {
+    addVariant(q);
   }
 
   if (profile.kind !== "life_science") {

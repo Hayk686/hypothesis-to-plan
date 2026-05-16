@@ -14,6 +14,7 @@ import {
   Wand2,
   FileSearch,
   CheckCircle2,
+  AlertTriangle,
   ExternalLink,
   ArrowRight,
   ArrowLeft,
@@ -71,7 +72,26 @@ type LiveQcResponse = {
     source?: "semantic-scholar" | "pubmed" | "merged" | "none";
     used_fallback?: boolean;
     primaryQuery?: string;
+    resultCount?: number;
+    errors?: string[];
+    attempts?: {
+      source_name: "semantic-scholar" | "pubmed";
+      query: string;
+      status_code: number;
+      result_count: number;
+      error_message: string | null;
+    }[];
   };
+};
+
+type LiveQcDiagnostics = {
+  elapsedMs: number;
+  attemptCount: number;
+  queries: string[];
+  errors: string[];
+  source: string;
+  status: "verified" | "weak" | "unavailable";
+  weakEvidence: boolean;
 };
 
 function livePaperToPlanPaper(p: LiveQcPaper) {
@@ -101,18 +121,52 @@ async function runLiveLiteratureQc(project: Project): Promise<{
   papers: ReturnType<typeof livePaperToPlanPaper>[];
   literatureQc: NonNullable<GeneratedPlan["literatureQc"]>;
   sourceLabel: string;
+  diagnostics: LiveQcDiagnostics;
 }> {
-  const res = await fetch("/api/search-literature", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({
-      hypothesis: project.hypothesis,
-      domain: project.domain,
-      organism_or_system: project.organism,
-      constraints: project.constraints,
-    }),
-  });
+  const MIN_VISIBLE_QC_MS = 1200;
+  const startedAt = performance.now();
+  const waitForMinimumVisibleTime = async () => {
+    const elapsed = performance.now() - startedAt;
+    if (elapsed < MIN_VISIBLE_QC_MS) {
+      await new Promise((resolve) => setTimeout(resolve, MIN_VISIBLE_QC_MS - elapsed));
+    }
+  };
+
+  let res: Response;
+  try {
+    res = await fetch("/api/search-literature", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        hypothesis: project.hypothesis,
+        domain: project.domain,
+        organism_or_system: project.organism,
+        constraints: project.constraints,
+      }),
+    });
+  } catch (err) {
+    await waitForMinimumVisibleTime();
+    return {
+      papers: [],
+      literatureQc: {
+        result: "Live literature check unavailable",
+        reason: `Literature QC could not reach the search endpoint. ${err instanceof Error ? err.message : "Network request failed."}`,
+      },
+      sourceLabel: "Live QC unavailable",
+      diagnostics: {
+        elapsedMs: Math.round(performance.now() - startedAt),
+        attemptCount: 0,
+        queries: [],
+        errors: [err instanceof Error ? err.message : "Network request failed."],
+        source: "unavailable",
+        status: "unavailable",
+        weakEvidence: true,
+      },
+    };
+  }
+
   if (!res.ok) {
+    await waitForMinimumVisibleTime();
     return {
       papers: [],
       literatureQc: {
@@ -120,13 +174,33 @@ async function runLiveLiteratureQc(project: Project): Promise<{
         reason: `Literature QC request failed with HTTP ${res.status}. No seeded HeLa references were substituted.`,
       },
       sourceLabel: "Live QC unavailable",
+      diagnostics: {
+        elapsedMs: Math.round(performance.now() - startedAt),
+        attemptCount: 0,
+        queries: [],
+        errors: [`HTTP ${res.status}`],
+        source: "unavailable",
+        status: "unavailable",
+        weakEvidence: true,
+      },
     };
   }
 
   const json = (await res.json()) as LiveQcResponse;
   const papers = (json.data ?? []).slice(0, 5).map(livePaperToPlanPaper);
   const debug = json.debug;
+  const attempts = debug?.attempts ?? [];
   const count = papers.length;
+  const hasTransportAttempts = attempts.length > 0;
+  const allAttemptsFailed =
+    hasTransportAttempts &&
+    attempts.every((a) => a.status_code === 0 || a.status_code >= 400 || Boolean(a.error_message));
+  const status: LiveQcDiagnostics["status"] =
+    allAttemptsFailed && count === 0
+      ? "unavailable"
+      : count >= 3 && !debug?.used_fallback
+        ? "verified"
+        : "weak";
   const sourceLabel =
     debug?.source === "merged"
       ? "Live Semantic Scholar + PubMed"
@@ -137,17 +211,44 @@ async function runLiveLiteratureQc(project: Project): Promise<{
           : "Live literature search";
 
   const result =
-    count === 0
-      ? "No prior work found"
-      : count <= 2 || debug?.used_fallback
-        ? "Limited similar work found"
-        : "Similar work exists";
+    status === "unavailable"
+      ? "Live literature check unavailable"
+      : count === 0
+        ? "No live references found"
+        : count <= 2 || debug?.used_fallback
+          ? "Limited similar work found"
+          : "Similar work exists";
+  const attemptsText =
+    attempts.length > 0
+      ? ` after ${attempts.length} live query attempt${attempts.length === 1 ? "" : "s"}`
+      : "";
   const reason =
-    count === 0
-      ? `No relevant papers returned for "${debug?.primaryQuery ?? project.hypothesis.slice(0, 120)}".`
-      : `Returned ${count} live reference${count === 1 ? "" : "s"} for this exact project context via ${sourceLabel}.`;
+    status === "unavailable"
+      ? `Literature QC ran, but all live source attempts failed. ${debug?.errors?.[0] ?? "Check API keys, network access, or upstream API availability."}`
+      : count === 0
+        ? `No relevant papers returned${attemptsText} for "${debug?.primaryQuery ?? project.hypothesis.slice(0, 120)}". This is not proof of novelty; it means the automated search did not find usable references.`
+        : `Returned ${count} live reference${count === 1 ? "" : "s"} for this exact project context via ${sourceLabel}.`;
 
-  return { papers, literatureQc: { result, reason }, sourceLabel };
+  await waitForMinimumVisibleTime();
+  return {
+    papers,
+    literatureQc: { result, reason },
+    sourceLabel,
+    diagnostics: {
+      elapsedMs: Math.round(performance.now() - startedAt),
+      attemptCount: attempts.length,
+      queries: attempts
+        .map((a) => a.query)
+        .filter(Boolean)
+        .slice(0, 6),
+      errors: [...(debug?.errors ?? []), ...attempts.map((a) => a.error_message).filter(Boolean)]
+        .filter((e, idx, arr): e is string => typeof e === "string" && arr.indexOf(e) === idx)
+        .slice(0, 4),
+      source: debug?.source ?? "none",
+      status,
+      weakEvidence: status !== "verified",
+    },
+  };
 }
 
 function NewProjectPage() {
@@ -157,6 +258,7 @@ function NewProjectPage() {
   const [draftProject, setDraftProject] = useState<Project | null>(null);
   const [draftPlan, setDraftPlan] = useState<GeneratedPlan | null>(null);
   const [qcSourceLabel, setQcSourceLabel] = useState("Live literature search");
+  const [qcDiagnostics, setQcDiagnostics] = useState<LiveQcDiagnostics | null>(null);
   const [exampleLoading, setExampleLoading] = useState(false);
   const [form, setForm] = useState({
     title: "",
@@ -241,7 +343,6 @@ function NewProjectPage() {
     // verified DEMO_PROJECT so Literature QC + plan are the verified ones.
     const effectiveProject: Project = project;
 
-    // Simulated literature QC latency (no network call — stays demo-stable).
     const qc = await runLiveLiteratureQc(project);
     const plan = {
       ...generatePlan(effectiveProject),
@@ -255,6 +356,7 @@ function NewProjectPage() {
     // projects), but reuse the verified plan content when it's the demo hypothesis.
     setDraftPlan(plan);
     setQcSourceLabel(qc.sourceLabel);
+    setQcDiagnostics(qc.diagnostics);
     setPhase("qc-review");
   }
 
@@ -279,6 +381,7 @@ function NewProjectPage() {
     setPhase("form");
     setDraftPlan(null);
     setDraftProject(null);
+    setQcDiagnostics(null);
   }
 
   const planLoadingStages = [
@@ -287,6 +390,9 @@ function NewProjectPage() {
     "Generating timeline & risks…",
     "Compiling validation plan…",
   ];
+  const isWeakQc = Boolean(
+    draftPlan && (qcDiagnostics?.weakEvidence ?? draftPlan.papers.length < 3),
+  );
 
   return (
     <div className="min-h-screen">
@@ -476,14 +582,28 @@ function NewProjectPage() {
 
         {phase === "qc-review" && draftPlan && draftProject && (
           <div className="space-y-5">
-            <Card className="border-primary/30 bg-gradient-card p-6 shadow-elegant">
+            <Card
+              className={`p-6 shadow-elegant ${
+                isWeakQc ? "border-warning/40 bg-warning/5" : "border-primary/30 bg-gradient-card"
+              }`}
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <FileSearch className="h-5 w-5 text-primary" />
+                  {isWeakQc ? (
+                    <AlertTriangle className="h-5 w-5 text-warning" />
+                  ) : (
+                    <FileSearch className="h-5 w-5 text-primary" />
+                  )}
                   <h2 className="font-display text-xl font-semibold">Literature QC</h2>
                 </div>
-                <Badge className="bg-primary/15 text-primary hover:bg-primary/20">
-                  Novelty signal: {draftPlan.literatureQc?.result ?? "Similar work exists"}
+                <Badge
+                  className={
+                    isWeakQc
+                      ? "bg-warning/15 text-warning hover:bg-warning/20"
+                      : "bg-primary/15 text-primary hover:bg-primary/20"
+                  }
+                >
+                  Evidence signal: {draftPlan.literatureQc?.result ?? "Similar work exists"}
                 </Badge>
               </div>
               <p className="mt-3 text-sm text-foreground/85">
@@ -498,10 +618,38 @@ function NewProjectPage() {
                   {qcSourceLabel}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  This check is live; seeded HeLa references are not substituted for other
-                  hypotheses.
+                  Checked {qcDiagnostics?.attemptCount ?? 0} search attempt
+                  {(qcDiagnostics?.attemptCount ?? 0) === 1 ? "" : "s"} in{" "}
+                  {qcDiagnostics ? (qcDiagnostics.elapsedMs / 1000).toFixed(1) : "—"}s; seeded HeLa
+                  references are not substituted.
                 </span>
               </div>
+              {qcDiagnostics?.queries.length ? (
+                <div className="mt-3 rounded-md border border-border/60 bg-background/60 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Searched queries
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {qcDiagnostics.queries.map((q) => (
+                      <Badge key={q} variant="outline" className="max-w-full text-[10px]">
+                        {q}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {qcDiagnostics?.errors.length ? (
+                <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-destructive">
+                    Source errors
+                  </div>
+                  <div className="mt-1 space-y-1 text-xs text-foreground/80">
+                    {qcDiagnostics.errors.map((err) => (
+                      <div key={err}>{err}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </Card>
 
             {draftPlan.papers.length > 0 ? (
@@ -562,12 +710,23 @@ function NewProjectPage() {
               </Card>
             )}
 
-            <Card className="border-success/30 bg-success/5 p-4">
+            <Card
+              className={
+                isWeakQc
+                  ? "border-warning/30 bg-warning/5 p-4"
+                  : "border-success/30 bg-success/5 p-4"
+              }
+            >
               <div className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                {isWeakQc ? (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                ) : (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                )}
                 <p className="text-sm text-foreground/85">
-                  Literature QC complete. You can now generate the full experiment plan — protocol,
-                  materials, budget, timeline, validation, and risks.
+                  {isWeakQc
+                    ? "Literature QC ran, but evidence is weak or empty. You can proceed, but the generated plan must be treated as a draft that needs manual literature review."
+                    : "Literature QC complete. You can now generate the full experiment plan — protocol, materials, budget, timeline, validation, and risks."}
                 </p>
               </div>
             </Card>
@@ -581,7 +740,7 @@ function NewProjectPage() {
                 className="bg-gradient-hero shadow-glow"
                 onClick={proceedToFullPlan}
               >
-                Proceed to Full Experiment Plan
+                {isWeakQc ? "Proceed with weak-evidence plan" : "Proceed to Full Experiment Plan"}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
