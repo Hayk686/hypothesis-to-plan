@@ -1,0 +1,11 @@
+SEMANTIC_SCHOLAR_API_KEY=
+OPENALEX_API_KEY=
+OPENALEX_EMAIL=your-email@example.com
+CROSSREF_MAILTO=your-email@example.com
+NCBI_API_KEY=
+PROTOCOLS_IO_CLIENT_TOKEN=
+LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=liquid/lfm-2.5-1.2b-instruct:free
+OPENROUTER_SITE_URL=https://your-project.vercel.app
+OPENROUTER_APP_TITLE=Hypothesis to Plan

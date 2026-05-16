@@ -14,6 +14,12 @@ This project is a TanStack Start app configured for Vercel with Nitro.
 Set these in Vercel Project Settings -> Environment Variables for Preview and Production.
 Do not prefix private keys with `VITE_`.
 
+You can use `vercel-env.example` as the import template:
+
+1. Duplicate it locally as `.env.vercel`.
+2. Fill the real values.
+3. In Vercel, use Environment Variables -> Import `.env` and paste/upload the filled contents.
+
 ```txt
 SEMANTIC_SCHOLAR_API_KEY=
 OPENALEX_API_KEY=
