@@ -125,7 +125,15 @@ def cmd_create(args) -> None:
         emit({"status": "error", "error": "--output is required for create", "files": [], "count": 0}, 1)
     os.makedirs(os.path.dirname(os.path.abspath(out)) or ".", exist_ok=True)
     doc = Document()
-    text = (args.text or "").replace("\\n", "\n")
+    if args.text_file:
+        src = strip_file_wrapper(args.text_file)
+        if not os.path.isfile(src):
+            emit({"status": "error", "error": f"text file not found: {src}", "files": [], "count": 0}, 1)
+        with open(src, "r", encoding="utf-8", errors="replace") as handle:
+            text = handle.read()
+    else:
+        text = args.text or ""
+    text = text.replace("\\n", "\n")
     for line in text.split("\n"):
         doc.add_paragraph(line)
     doc.save(out)
@@ -156,6 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_new = sub.add_parser("create", help="Create a new .docx from text")
     p_new.add_argument("--output", required=True)
     p_new.add_argument("--text", default="")
+    p_new.add_argument("--text-file", help="Read document text from a UTF-8 text file")
     p_new.set_defaults(func=cmd_create)
 
     return parser

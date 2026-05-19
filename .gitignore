@@ -11,6 +11,7 @@ __pycache__/
 picoclaw/config.local.json
 
 # Dynamic directories / state
+input/telegram/
 output/
 sessions/
 state/
@@ -19,6 +20,7 @@ cron/
 .claude/
 
 # Logs and background tasks
+logs/
 HEARTBEAT.md
 heartbeat.log
 *.log
