@@ -1,0 +1,9 @@
+model_list:
+  openrouter-free:
+    api_keys:
+      - file://openrouter_api_key.txt
+tools:
+  web:
+    tavily:
+      api_keys:
+        - file://tavily_api_key.txt
