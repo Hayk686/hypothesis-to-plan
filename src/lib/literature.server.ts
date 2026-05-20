@@ -25,6 +25,9 @@ const PUBMED_ESUMMARY = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.
 
 const SUCCESS_THRESHOLD = 3;
 const FALLBACK_QUERY_LIMIT = 3;
+const DOMAIN_REQUIRED_TERMS = {
+  soil_moisture_sensor: ["soil", "moisture", "sensor"],
+} as const;
 
 export type LiteratureSource = "semantic-scholar" | "openalex" | "crossref" | "pubmed";
 
@@ -201,6 +204,9 @@ function buildQueryVariants(input: LiteratureInput, primary: string): string[] {
     addVariant("air quality sensor calibration reference monitor");
   }
   if (/soil.?moisture|soil.?water|volumetric water|vwc|field crop|irrigation/.test(text)) {
+    addVariant("soil moisture sensor site specific calibration");
+    addVariant("soil moisture sensor field calibration crop plots");
+    addVariant("soil water sensor calibration field capacity error");
     addVariant("soil moisture sensor calibration manufacturer equation field");
     addVariant("site specific calibration soil moisture sensors accuracy");
     addVariant("soil water sensor factory calibration field correction");
@@ -625,7 +631,26 @@ function dedupeMerge(existing: NormalizedPaper[], incoming: NormalizedPaper[]): 
   return out;
 }
 
-function lexicalScore(paper: NormalizedPaper, queryTokens: string[]): number {
+function requiredDomainTerms(queries: string[]): readonly string[] {
+  const q = queries.join(" ").toLowerCase();
+  if (/soil.?moisture|soil.?water|volumetric water|vwc/.test(q) && /sensor|probe/.test(q)) {
+    return DOMAIN_REQUIRED_TERMS.soil_moisture_sensor;
+  }
+  return [];
+}
+
+function hasRequiredDomainTerms(paper: NormalizedPaper, requiredTerms: readonly string[]): boolean {
+  if (requiredTerms.length === 0) return true;
+  const text = `${paper.title} ${paper.abstract}`.toLowerCase();
+  const matches = requiredTerms.filter((t) => text.includes(t));
+  return matches.length >= Math.min(requiredTerms.length, 2);
+}
+
+function lexicalScore(
+  paper: NormalizedPaper,
+  queryTokens: string[],
+  requiredTerms: readonly string[],
+): number {
   const title = paper.title.toLowerCase();
   const abstract = paper.abstract.toLowerCase();
   let score = 0;
@@ -633,18 +658,28 @@ function lexicalScore(paper: NormalizedPaper, queryTokens: string[]): number {
     if (title.includes(t)) score += 2;
     else if (abstract.includes(t)) score += 1;
   }
+  if (!hasRequiredDomainTerms(paper, requiredTerms)) {
+    score -= queryTokens.length;
+  }
   return queryTokens.length ? score / (queryTokens.length * 2) : 0;
 }
 
 function rerank(papers: NormalizedPaper[], queries: string[]): NormalizedPaper[] {
+  const requiredTerms = requiredDomainTerms(queries);
   const queryTokens = Array.from(
-    new Set(tokens(queries.join(" ")).filter((t) => !["study", "field", "effect"].includes(t))),
-  ).slice(0, 16);
+    new Set(
+      tokens(queries.join(" ")).filter(
+        (t) => !["study", "field", "effect", "specific", "calibration", "curve"].includes(t),
+      ),
+    ),
+  ).slice(0, 18);
   const scored = papers.map((p) => ({
     paper: p,
-    lexical: lexicalScore(p, queryTokens),
+    lexical: lexicalScore(p, queryTokens, requiredTerms),
   }));
-  const relevant = scored.filter((row) => row.lexical >= 0.08);
+  const relevant = scored.filter(
+    (row) => row.lexical >= 0.08 && hasRequiredDomainTerms(row.paper, requiredTerms),
+  );
   const pool = relevant.length > 0 ? relevant : scored;
   const sorted = [...pool].sort((a, b) => {
     if (b.lexical !== a.lexical) return b.lexical - a.lexical;
@@ -665,6 +700,11 @@ function rerank(papers: NormalizedPaper[], queries: string[]): NormalizedPaper[]
     evidence_role: evidenceRole(idx),
   }));
 }
+
+export const __literatureTestHooks = {
+  buildQueryVariants,
+  rerank,
+};
 
 // ---------- public entrypoint ----------
 
