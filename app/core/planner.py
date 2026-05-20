@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.llm_turn import run_llm_turn
+from app.core.role_prompts import role_system_prompt
 from app.core.tool_registry import ToolContext, ToolRegistry
 from app.core.types import Outgoing
 
@@ -175,7 +176,6 @@ def run_planned_workflow(
         "role": "controller",
         "confidence": 0.86,
         "needs_tools": True,
-        "needs_critic": True,
         "reason": f"multi-step workflow: {plan.reason}",
     }
     log_planner_event(context, "planner_started", plan=plan_to_dict(plan))
@@ -208,7 +208,7 @@ def run_planned_workflow(
                 return fail_workflow(
                     context,
                     task_id,
-                    "Research нашел источники, но AI-вывод не прошел проверку качества. Я остановился, чтобы не создавать плохой файл.",
+                    "Research нашел источники, но AI-вывод не получился. Я остановился, чтобы не создавать пустой файл.",
                     output_files,
                     cleanup_files,
                 )
@@ -389,16 +389,27 @@ def transform_text(registry: ToolRegistry, context: ToolContext, source_text: st
         f"{source_text}\n\n"
         "Return only the final transformed text. Keep useful links or source labels if they matter."
     )
+    role = role_for_transform_instruction(instruction)
+    system = role_system_prompt(
+        context.root,
+        role,
+        (
+            "You transform existing text for the user's workflow. "
+            "Follow the instruction exactly. Do not add meta commentary."
+        ),
+    )
+    system = (
+        system.rstrip()
+        + "\n\nWorkflow transform contract: Transform the provided source text according to the instruction. "
+        "Return only the final transformed text. Keep useful links or source labels if they matter."
+    )
     return run_llm_turn(
         registry,
         context,
         prompt=prompt,
-        system=(
-            "You transform existing text for the user's workflow. "
-            "Follow the instruction exactly. Do not add meta commentary."
-        ),
+        system=system,
         language_text=instruction,
-        role=role_for_transform_instruction(instruction),
+        role=role,
     )
 
 
@@ -616,9 +627,8 @@ def mark_step(context: ToolContext, task_id: str, index: int, status: str, messa
 
 def log_planner_event(context: ToolContext, kind: str, **kwargs: Any) -> None:
     task_logger = getattr(context, "logger", None)
-    json_logger = getattr(task_logger, "logger", None)
-    if json_logger:
-        json_logger.event(kind, task_id=context.task_id, **json_safe(kwargs))
+    if task_logger and hasattr(task_logger, "event"):
+        task_logger.event(kind, task_id=context.task_id, **json_safe(kwargs))
 
 
 def plan_to_dict(plan: TaskPlan) -> dict[str, Any]:

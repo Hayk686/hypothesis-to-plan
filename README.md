@@ -23,6 +23,7 @@
 .\scripts\runtime_cli.ps1 /help
 .\scripts\runtime_cli.ps1 /search "Telegram Bot API latest"
 .\scripts\runtime_cli.ps1 /ask "ответь одним словом: ping"
+.\scripts\runtime_cli.ps1 /browser "https://example.com"
 .\scripts\runtime_cli.ps1 --file input\example.pdf "сделай докс"
 ```
 
@@ -36,6 +37,8 @@ PicoClaw и новый runtime нельзя одновременно запус�
 - `/dl <links> [items] [format]` - скачать аудио через `scripts\converter.py`
 - `/search <query>` - поиск в интернете
 - `/fetch <url>` - прочитать страницу
+- `/browser <url>` - открыть страницу в headless browser и вернуть видимый текст/ссылки
+- `/browser screenshot <url>` - открыть страницу и отправить screenshot
 - `/ask <question>` - спросить ИИ без web-поиска
 - `/research <query>` - web-поиск, чтение источников и краткий AI-вывод
 - `/clear` - очистить сохраненное состояние чата и удалить запомненные Telegram-сообщения
@@ -120,6 +123,6 @@ picoclaw/
 ## Следующие слои
 
 - safety/permissions layer для опасных действий;
-- browser/Chrome layer для задач в браузере;
+- richer browser/Chrome actions: click, fill, login/session profiles;
 - memory/context layer;
 - business tools для магазина: Excel/CSV, остатки, продажи, маржа.

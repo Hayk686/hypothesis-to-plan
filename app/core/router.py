@@ -8,6 +8,7 @@ from typing import Any
 
 from app.core.command_registry import cleanup_from_result
 from app.core.model_orchestrator import llm_kwargs_for_role, role_temperature
+from app.core.role_prompts import role_system_prompt
 from app.core.tool_registry import ToolContext, ToolRegistry
 from app.core.types import Outgoing
 
@@ -15,17 +16,17 @@ from app.core.types import Outgoing
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 AUDIO_FORMAT_RE = re.compile(r"\b(mp3|m4a|wav|flac|opus|aac|alac|vorbis|ogg|best)\b", re.IGNORECASE)
 ORCHESTRATOR_CONFIDENCE_THRESHOLD = 0.55
-ORCHESTRATOR_ROLES = {"chat", "research", "coder", "writer", "critic", "controller"}
+ORCHESTRATOR_ROLES = {"chat", "research", "coder", "writer", "controller"}
 ORCHESTRATOR_SCHEMA = {
     "type": "object",
     "properties": {
-        "role": {"type": "string", "enum": ["chat", "research", "coder", "writer", "critic", "controller"]},
+        "role": {"type": "string", "enum": ["chat", "research", "coder", "writer", "controller"]},
         "confidence": {"type": "number"},
         "needs_tools": {"type": "boolean"},
-        "needs_critic": {"type": "boolean"},
         "reason": {"type": "string"},
+        "suggested_next_step": {"type": "string"},
     },
-    "required": ["role", "confidence", "needs_tools", "needs_critic", "reason"],
+    "required": ["role", "confidence", "needs_tools", "reason"],
 }
 
 
@@ -37,11 +38,11 @@ class TextRoutePlan:
     role: str = "chat"
     confidence: float = 0.5
     needs_tools: bool = False
-    needs_critic: bool = False
+    suggested_next_step: str = ""
 
 
 def route_text(root: Path, text: str, registry: ToolRegistry, context: ToolContext, commands: Any) -> Outgoing:
-    plan = plan_text_route(text)
+    plan = plan_text_route(text, context)
     if should_ask_orchestrator(text, plan):
         plan = orchestrator_route(text, registry, context, fallback=plan)
     context.metadata["route_action"] = plan.action
@@ -51,17 +52,17 @@ def route_text(root: Path, text: str, registry: ToolRegistry, context: ToolConte
         "role": plan.role,
         "confidence": plan.confidence,
         "needs_tools": plan.needs_tools,
-        "needs_critic": plan.needs_critic,
         "reason": plan.reason,
+        "suggested_next_step": plan.suggested_next_step,
     }
     log_router_step(context, plan)
 
-    if plan.action in {"download_audio", "research", "fetch"}:
+    if plan.action in {"download_audio", "research", "fetch", "browser", "verify_url"}:
         return commands.run(plan.command_text, root, registry, context)
     return commands.run(text, root, registry, context)
 
 
-def plan_text_route(text: str) -> TextRoutePlan:
+def plan_text_route(text: str, context: ToolContext | None = None) -> TextRoutePlan:
     stripped = text.strip()
     if not stripped:
         return TextRoutePlan(action="chat", reason="empty text", role="chat", confidence=1.0)
@@ -79,7 +80,18 @@ def plan_text_route(text: str) -> TextRoutePlan:
             needs_tools=True,
         )
 
-    if urls and fetch_intent(lowered):
+    if urls and url_verification_intent(lowered, context):
+        return TextRoutePlan(
+            action="verify_url",
+            reason="URL follow-up verification against active research",
+            command_text=f"/verify {urls[0]}",
+            role="research",
+            confidence=0.9,
+            needs_tools=True,
+            suggested_next_step="Fetch the URL and compare it with the active research requirements.",
+        )
+
+    if urls and fetch_intent(lowered) and not browser_intent(lowered):
         return TextRoutePlan(
             action="fetch",
             reason="fetch/read URL intent",
@@ -87,6 +99,48 @@ def plan_text_route(text: str) -> TextRoutePlan:
             role="research",
             confidence=0.88,
             needs_tools=True,
+        )
+
+    if urls and browser_intent(lowered):
+        return TextRoutePlan(
+            action="browser",
+            reason="browser page intent with URL",
+            command_text=f"/browser {stripped}",
+            role="research",
+            confidence=0.88,
+            needs_tools=True,
+        )
+
+    if not urls and browser_followup_intent(lowered):
+        url = latest_context_url(context)
+        if url:
+            return TextRoutePlan(
+                action="browser",
+                reason="browser follow-up using last URL",
+                command_text=f"/browser {url}",
+                role="research",
+                confidence=0.9,
+                needs_tools=True,
+                suggested_next_step="Open the most recent URL from chat context in browser_read.",
+            )
+
+    if search_strategy_question(lowered):
+        return TextRoutePlan(
+            action="chat",
+            reason="search strategy question, not an immediate web search",
+            role="chat",
+            confidence=0.86,
+            needs_tools=False,
+        )
+
+    if artifact_followup_intent(lowered) and not force_web_intent(lowered):
+        return TextRoutePlan(
+            action="chat",
+            reason="active artifact follow-up intent",
+            role="chat",
+            confidence=0.87 if active_artifact_available(context) else 0.76,
+            needs_tools=False,
+            suggested_next_step="Answer from the active artifact/context instead of starting a new web search.",
         )
 
     if research_intent(lowered):
@@ -97,16 +151,14 @@ def plan_text_route(text: str) -> TextRoutePlan:
             role="research",
             confidence=0.9,
             needs_tools=True,
-            needs_critic=True,
         )
 
-    if critic_intent(lowered) and not fix_or_implement_intent(lowered):
+    if review_intent(lowered) and not fix_or_implement_intent(lowered):
         return TextRoutePlan(
             action="chat",
             reason="review/quality-check intent",
-            role="critic",
+            role="chat",
             confidence=0.82,
-            needs_critic=False,
         )
 
     if coding_intent(lowered):
@@ -116,7 +168,6 @@ def plan_text_route(text: str) -> TextRoutePlan:
             role="coder",
             confidence=0.82,
             needs_tools=project_change_intent(lowered),
-            needs_critic=True,
         )
 
     if writing_intent(lowered):
@@ -125,7 +176,15 @@ def plan_text_route(text: str) -> TextRoutePlan:
             reason="writing/translation intent",
             role="writer",
             confidence=0.78,
-            needs_critic=True,
+        )
+
+    if explanation_intent(lowered):
+        return TextRoutePlan(
+            action="chat",
+            reason="stable explanation/how-to intent",
+            role="chat",
+            confidence=0.84,
+            suggested_next_step="Explain the topic directly without web search unless current sources are requested.",
         )
 
     if ambiguous_action_intent(lowered):
@@ -150,18 +209,19 @@ def orchestrator_route(
     *,
     fallback: TextRoutePlan,
 ) -> TextRoutePlan:
-    system = (
+    fallback_system = (
         "You are a cheap router for a local Telegram agent. Do not solve the user's task. "
         "Return only valid JSON matching the schema. Choose exactly one role. "
         "Use controller only for clearly multi-step work that must coordinate multiple roles. "
         "Use research only when current/web/source information is needed. "
         "Use coder for code/project/debug/implementation. Use writer for translation, rewriting, PDF/DOCX text. "
-        "Use critic for review/check/improve/error-finding tasks. Otherwise use chat."
+        "Use chat for review/check/improve/error-finding tasks unless they clearly require code. Otherwise use chat."
     )
+    system = role_system_prompt(context.root, "orchestrator", fallback_system)
     prompt = (
         "Classify this user message for routing. Return JSON only.\n\n"
         f"User message:\n{text}\n\n"
-        "Fields: role, confidence, needs_tools, needs_critic, reason."
+        "Fields: role, confidence, needs_tools, reason, suggested_next_step."
     )
     result = registry.run(
         "llm_chat",
@@ -186,8 +246,8 @@ def orchestrator_route(
         role = fallback.role
     confidence = clamp_float(decision.get("confidence"), fallback.confidence)
     needs_tools = bool(decision.get("needs_tools", fallback.needs_tools))
-    needs_critic = bool(decision.get("needs_critic", fallback.needs_critic))
     reason = str(decision.get("reason") or fallback.reason).strip() or fallback.reason
+    suggested_next_step = str(decision.get("suggested_next_step") or fallback.suggested_next_step).strip()
 
     action = "chat"
     command_text = ""
@@ -202,7 +262,7 @@ def orchestrator_route(
         role=role,
         confidence=confidence,
         needs_tools=needs_tools,
-        needs_critic=needs_critic,
+        suggested_next_step=suggested_next_step,
     )
     log_orchestrator_decision(context, plan, result.raw)
     return plan
@@ -300,6 +360,129 @@ def fetch_intent(lowered: str) -> bool:
     return any(marker in lowered for marker in markers)
 
 
+def browser_intent(lowered: str) -> bool:
+    markers = (
+        "browser",
+        "chrome",
+        "open in browser",
+        "open",
+        "show",
+        "browser use",
+        "браузер",
+        "браузере",
+        "хром",
+        "открой",
+        "покажи",
+        "открой в браузере",
+        "через браузер",
+        "скриншот страницы",
+        "сделай скриншот",
+    )
+    return any(marker in lowered for marker in markers)
+
+
+def browser_followup_intent(lowered: str) -> bool:
+    stripped = re.sub(r"\s+", " ", lowered).strip(" .,!?:;")
+    if len(stripped.split()) > 5:
+        return False
+    markers = {
+        "открой",
+        "открой ее",
+        "открой её",
+        "открой это",
+        "открой ссылку",
+        "открой страницу",
+        "покажи",
+        "покажи ее",
+        "покажи её",
+        "покажи это",
+        "через браузер",
+        "в браузере",
+        "open",
+        "open it",
+        "open this",
+        "show",
+        "show it",
+        "browser",
+    }
+    return stripped in markers
+
+
+def latest_context_url(context: ToolContext | None) -> str:
+    if not context:
+        return ""
+
+    url = latest_artifact_url(context)
+    if url:
+        return url
+
+    for line in (context.memory_context or "").splitlines():
+        if not line.startswith("Last URLs:"):
+            continue
+        urls = extract_urls(line)
+        if urls:
+            return urls[-1]
+    return ""
+
+
+def latest_artifact_url(context: ToolContext) -> str:
+    if not context.artifact_store:
+        return ""
+    artifact = context.artifact_store.resolve(context.artifact_key)
+    if not artifact or not artifact.urls:
+        return ""
+    if artifact.kind == "browser_page":
+        metadata_url = str((artifact.metadata or {}).get("url") or "")
+        urls = extract_urls(metadata_url)
+        if urls:
+            return urls[0]
+        return artifact.urls[0]
+    if artifact.kind in {"url_check", "web_page"} or len(artifact.urls) == 1:
+        return artifact.urls[0]
+    return ""
+
+
+def url_verification_intent(lowered: str, context: ToolContext | None) -> bool:
+    if not active_artifact_has_single_link_terms(context):
+        return False
+
+    non_url_text = URL_RE.sub(" ", lowered)
+    markers = (
+        "а эта",
+        "а этот",
+        "а это",
+        "эта ссылка",
+        "этот url",
+        "этот линк",
+        "проверь",
+        "проверить",
+        "подходит",
+        "чего там",
+        "что там",
+        "что из этого",
+        "есть ли",
+        "нет ли",
+        "is this",
+        "does this",
+        "check this",
+        "verify this",
+        "this link",
+        "this url",
+    )
+    return any(marker in non_url_text for marker in markers)
+
+
+def active_artifact_has_single_link_terms(context: ToolContext | None) -> bool:
+    if not context or not context.artifact_store:
+        return False
+    artifact = context.artifact_store.resolve(context.artifact_key)
+    if not artifact:
+        return False
+    metadata = artifact.metadata or {}
+    terms = metadata.get("terms")
+    return bool(isinstance(terms, list) and terms)
+
+
 def research_intent(lowered: str) -> bool:
     markers = (
         "найди",
@@ -337,6 +520,80 @@ def research_intent(lowered: str) -> bool:
     return any(marker in lowered for marker in markers)
 
 
+def artifact_followup_intent(lowered: str) -> bool:
+    reference_markers = (
+        "это",
+        "этот",
+        "этом",
+        "этой",
+        "эту",
+        "тут",
+        "здесь",
+        "предыдущ",
+        "последний результат",
+        "this",
+        "that",
+        "here",
+        "previous result",
+        "last result",
+    )
+    artifact_subjects = (
+        "репо",
+        "репозит",
+        "страниц",
+        "сайт",
+        "коммит",
+        "commit",
+        "repo",
+        "repository",
+        "page",
+        "site",
+    )
+    if any(ref in lowered for ref in reference_markers) and any(subject in lowered for subject in artifact_subjects):
+        return True
+    return any(phrase in lowered for phrase in ("в этом репо", "на этой странице", "this repo", "this page"))
+
+
+def force_web_intent(lowered: str) -> bool:
+    markers = (
+        "найди в интернете",
+        "поищи в интернете",
+        "погугли",
+        "дай источники",
+        "с источниками",
+        "web search",
+        "search the web",
+        "google it",
+        "with sources",
+    )
+    return any(marker in lowered for marker in markers)
+
+
+def active_artifact_available(context: ToolContext | None) -> bool:
+    if not context or not context.artifact_store:
+        return False
+    return bool(context.artifact_store.resolve(context.artifact_key))
+
+
+def search_strategy_question(lowered: str) -> bool:
+    strategy_markers = (
+        "какими методами",
+        "каким методом",
+        "как будешь искать",
+        "как хочешь найти",
+        "как хочешь искать",
+        "как искать",
+        "какие методы",
+        "методы поиска",
+        "способы поиска",
+        "если мало информации",
+        "задай вопросы",
+        "задай вопрос",
+    )
+    web_markers = ("интернет", "источник", "найди", "поиск", "research", "web")
+    return any(marker in lowered for marker in strategy_markers) and any(marker in lowered for marker in web_markers)
+
+
 def coding_intent(lowered: str) -> bool:
     markers = (
         "code",
@@ -368,11 +625,10 @@ def coding_intent(lowered: str) -> bool:
     return any(marker in lowered for marker in markers)
 
 
-def critic_intent(lowered: str) -> bool:
+def review_intent(lowered: str) -> bool:
     markers = (
         "review",
         "check",
-        "critic",
         "improve",
         "quality",
         "errors",
@@ -445,6 +701,27 @@ def writing_intent(lowered: str) -> bool:
     return any(marker in lowered for marker in markers)
 
 
+def explanation_intent(lowered: str) -> bool:
+    markers = (
+        "мне нужно понять",
+        "хочу понять",
+        "объясни",
+        "объяснить",
+        "что такое",
+        "как работает",
+        "как создать",
+        "как сделать",
+        "по шагам",
+        "простыми словами",
+        "разбери",
+        "explain",
+        "understand",
+        "how to",
+        "step by step",
+    )
+    return any(marker in lowered for marker in markers)
+
+
 def ambiguous_action_intent(lowered: str) -> bool:
     markers = (
         "сделай",
@@ -503,33 +780,31 @@ def clamp_float(value: Any, fallback: float) -> float:
 
 def log_router_step(context: ToolContext, plan: TextRoutePlan) -> None:
     task_logger = getattr(context, "logger", None)
-    json_logger = getattr(task_logger, "logger", None)
-    if json_logger:
-        json_logger.event(
+    if task_logger and hasattr(task_logger, "event"):
+        task_logger.event(
             "router_planned",
             task_id=context.task_id,
             action=plan.action,
             role=plan.role,
             confidence=plan.confidence,
             needs_tools=plan.needs_tools,
-            needs_critic=plan.needs_critic,
             reason=plan.reason,
+            suggested_next_step=plan.suggested_next_step,
             command_text=plan.command_text,
         )
 
 
 def log_orchestrator_decision(context: ToolContext, plan: TextRoutePlan, raw: dict[str, Any]) -> None:
     task_logger = getattr(context, "logger", None)
-    json_logger = getattr(task_logger, "logger", None)
-    if json_logger:
-        json_logger.event(
+    if task_logger and hasattr(task_logger, "event"):
+        task_logger.event(
             "orchestrator_decision",
             task_id=context.task_id,
             role=plan.role,
             confidence=plan.confidence,
             needs_tools=plan.needs_tools,
-            needs_critic=plan.needs_critic,
             reason=plan.reason,
+            suggested_next_step=plan.suggested_next_step,
             provider=raw.get("provider", ""),
             model=raw.get("model", ""),
         )
@@ -537,9 +812,8 @@ def log_orchestrator_decision(context: ToolContext, plan: TextRoutePlan, raw: di
 
 def log_orchestrator_fallback(context: ToolContext, fallback: TextRoutePlan, reason: str) -> None:
     task_logger = getattr(context, "logger", None)
-    json_logger = getattr(task_logger, "logger", None)
-    if json_logger:
-        json_logger.event(
+    if task_logger and hasattr(task_logger, "event"):
+        task_logger.event(
             "orchestrator_fallback",
             task_id=context.task_id,
             role=fallback.role,

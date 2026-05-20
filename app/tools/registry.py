@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.core.tool_registry import ToolContext, ToolRegistry
+from app.tools.browser import browser_read, browser_status
 from app.tools.common import ToolResult
 from app.tools.documents import convert_docx_to_pdf, convert_pdf_to_docx, create_docx
 from app.tools.llm import llm_chat
@@ -43,6 +44,16 @@ def build_tool_registry() -> ToolRegistry:
         "web_fetch",
         "Fetch a web page and return readable text.",
         _web_fetch,
+    )
+    registry.register(
+        "browser_status",
+        "Check whether local browser automation is available.",
+        _browser_status,
+    )
+    registry.register(
+        "browser_read",
+        "Open a web page in a headless browser and return visible text, links, and optional screenshot.",
+        _browser_read,
     )
     registry.register(
         "llm_chat",
@@ -95,6 +106,19 @@ def _web_search(context: ToolContext, args: dict):
 
 def _web_fetch(context: ToolContext, args: dict):
     return web_fetch(args.get("url", ""), args.get("max_chars", 6000))
+
+
+def _browser_status(context: ToolContext, args: dict):
+    return browser_status()
+
+
+def _browser_read(context: ToolContext, args: dict):
+    return browser_read(
+        context.root,
+        args.get("url", ""),
+        int(args.get("max_chars", 5000)),
+        bool(args.get("screenshot", False)),
+    )
 
 
 def _llm_chat(context: ToolContext, args: dict):

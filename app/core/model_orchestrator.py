@@ -8,7 +8,7 @@ from app.config import RuntimeConfig
 from app.tools.models import PROVIDERS, active_model_selection, model_selection, normalize_provider
 
 
-ROLE_ORDER = ("orchestrator", "controller", "chat", "research", "coder", "writer", "critic")
+ROLE_ORDER = ("orchestrator", "controller", "chat", "research", "coder", "writer")
 
 ROLE_DESCRIPTIONS = {
     "orchestrator": "cheap JSON router used only when rules are unsure",
@@ -17,7 +17,6 @@ ROLE_DESCRIPTIONS = {
     "research": "summarizes web/search results with sources",
     "coder": "coding and technical implementation",
     "writer": "translation, rewriting, documents",
-    "critic": "quality checks and repair decisions",
 }
 
 ROLE_ALIASES = {
@@ -31,8 +30,8 @@ ROLE_ALIASES = {
     "translate": "writer",
     "translator": "writer",
     "writing": "writer",
-    "review": "critic",
-    "checker": "critic",
+    "review": "chat",
+    "checker": "chat",
     "default": "chat",
 }
 
@@ -79,12 +78,6 @@ DEFAULT_ROLE_CONFIGS: dict[str, dict[str, Any]] = {
         "fallback_provider": "openrouter",
         "fallback_models": ("google/gemma-4-31b-it:free",),
         "temperature": 0.5,
-    },
-    "critic": {
-        "provider": "openrouter",
-        "model": "openai/gpt-oss-120b:free",
-        "fallback_models": ("nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-31b-it:free"),
-        "temperature": 0.0,
     },
 }
 

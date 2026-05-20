@@ -125,7 +125,7 @@ class TelegramRuntime:
         self.config = config
         self.client = TelegramClient(config.telegram_token)
         self.log = JsonlLogger(config.logs_dir / "events.jsonl")
-        self.task_log = TaskLogger(JsonlLogger(config.logs_dir / "tasks.jsonl"))
+        self.task_log = TaskLogger(JsonlLogger(config.logs_dir / "tasks.jsonl"), observer=self._trace_event)
         self.core = AgentCore(config.root, task_log=self.task_log, config=config)
         self.offset_path = config.state_dir / "telegram_offset.json"
         self.config.state_dir.mkdir(parents=True, exist_ok=True)
@@ -134,6 +134,10 @@ class TelegramRuntime:
         self.pending_commands = self._load_pending_commands()
         self.history_path = config.state_dir / "telegram_message_history.json"
         self.message_history = self._load_message_history()
+        self.trace_enabled = True
+        self._current_trace_key = ""
+        self._trace_task_keys: dict[str, str] = {}
+        self._trace_lines: dict[str, list[str]] = {}
 
     def run_forever(self) -> None:
         self._sync_commands()
@@ -177,12 +181,16 @@ class TelegramRuntime:
         self.log.event("message_received", chat_id=chat_id, text=text, has_document=bool(message.get("document")))
 
         thought_message_id = self._send_thought_message(chat_id, message, text)
-        if message.get("document"):
-            outgoing = self._handle_document(message, text)
-        else:
-            outgoing = self._handle_text_message(chat_id, message, text)
+        self._current_trace_key = trace_key(chat_id, thought_message_id) if thought_message_id else ""
+        try:
+            if message.get("document"):
+                outgoing = self._handle_document(message, text)
+            else:
+                outgoing = self._handle_text_message(chat_id, message, text)
 
-        self._deliver(chat_id, outgoing, thought_message_id)
+            self._deliver(chat_id, outgoing, thought_message_id)
+        finally:
+            self._current_trace_key = ""
 
     def _handle_text_message(self, chat_id: int, message: dict[str, Any], text: str) -> Outgoing:
         command = first_command_token(text)
@@ -237,6 +245,10 @@ class TelegramRuntime:
             result = self.client.send_message(chat_id, thought)
             self._remember_sent_result(chat_id, result)
             message_id = sent_message_id(result)
+            if self.trace_enabled and message_id:
+                key = trace_key(chat_id, message_id)
+                self._trace_lines[key] = [thought]
+                self._edit_trace_message(key)
             self.log.event("thought_message_sent", chat_id=chat_id, message_id=message_id, text=thought)
             return message_id
         except Exception as exc:
@@ -274,6 +286,8 @@ class TelegramRuntime:
             return "Ищу в интернете..."
         if action == "fetch":
             return "Читаю страницу..."
+        if action == "browser":
+            return "Открываю страницу в браузере..."
         if action == "research":
             return "Ищу источники и собираю ответ..."
         if action == "model":
@@ -314,6 +328,22 @@ class TelegramRuntime:
                 self.log.exception("document_delete_failed", exc, file_name=file_name, path=str(saved_path))
 
     def _deliver(self, chat_id: int, outgoing: Outgoing, thought_message_id: int | None = None) -> None:
+        if self.trace_enabled and thought_message_id:
+            if outgoing.text and not outgoing.files:
+                result = self.client.send_message(chat_id, outgoing.text)
+                self._remember_sent_result(chat_id, result)
+                self.log.event("message_sent", chat_id=chat_id, text=outgoing.text)
+
+            for path in outgoing.files:
+                result = self.client.send_file(chat_id, path, outgoing.text)
+                self._remember_sent_result(chat_id, result)
+                self.log.event("file_sent", chat_id=chat_id, path=str(path))
+
+            if outgoing.cleanup_files:
+                self._cleanup_sent_files(outgoing.cleanup_files)
+
+            return
+
         if thought_message_id and outgoing.text and not outgoing.files:
             try:
                 self.client.edit_message_text(chat_id, thought_message_id, outgoing.text)
@@ -344,6 +374,47 @@ class TelegramRuntime:
 
         if outgoing.text and outgoing.files:
             return
+
+    def _trace_event(self, kind: str, fields: dict[str, Any]) -> None:
+        if not self.trace_enabled:
+            return
+
+        task_id = str(fields.get("task_id", ""))
+        if kind == "task_started":
+            key = self._current_trace_key
+            if not key or not task_id:
+                return
+            self._trace_task_keys[task_id] = key
+            text = str(fields.get("text", "")).strip()
+            if text:
+                self._append_trace(task_id, f"Запрос: {short_trace_text(text)}")
+            return
+
+        line = trace_line(kind, fields)
+        if not line or not task_id:
+            return
+        self._append_trace(task_id, line)
+
+    def _append_trace(self, task_id: str, line: str) -> None:
+        key = self._trace_task_keys.get(task_id)
+        if not key:
+            return
+        lines = self._trace_lines.setdefault(key, [])
+        if lines and lines[-1] == line:
+            return
+        lines.append(line)
+        del lines[:-12]
+        self._edit_trace_message(key)
+
+    def _edit_trace_message(self, key: str) -> None:
+        chat_id, message_id = parse_trace_key(key)
+        if chat_id is None or message_id is None:
+            return
+        text = format_trace(self._trace_lines.get(key, []))
+        try:
+            self.client.edit_message_text(chat_id, message_id, text)
+        except Exception as exc:
+            self.log.exception("trace_message_edit_failed", exc, chat_id=chat_id, message_id=message_id)
 
     def _cleanup_sent_files(self, files: list[Path]) -> None:
         output_root = self.config.output_dir.resolve()
@@ -512,6 +583,143 @@ class TelegramRuntime:
             self._save_pending_commands()
             self.log.event("pending_command_cleared", chat_id=chat_id, command=command)
         return command
+
+
+def trace_key(chat_id: int, message_id: int | None) -> str:
+    return f"{chat_id}:{message_id}" if message_id else ""
+
+
+def parse_trace_key(key: str) -> tuple[int | None, int | None]:
+    try:
+        chat_id_text, message_id_text = key.split(":", 1)
+        return int(chat_id_text), int(message_id_text)
+    except (TypeError, ValueError):
+        return None, None
+
+
+def format_trace(lines: list[str]) -> str:
+    visible = [line for line in lines if line.strip()][-12:]
+    if not visible:
+        visible = ["Думаю..."]
+    body = "\n".join(f"- {line}" for line in visible)
+    text = "Ход работы\n" + body
+    return text[:3900]
+
+
+def trace_line(kind: str, fields: dict[str, Any]) -> str:
+    if kind == "dialogue_resolved":
+        original = short_trace_text(str(fields.get("original_text", "")), 70)
+        effective = short_trace_text(str(fields.get("effective_text", "")), 100)
+        return f"Контекст: понял «{original}» как «{effective}»"
+
+    if kind == "router_planned":
+        action = fields.get("action", "chat")
+        role = fields.get("role", "chat")
+        confidence = format_confidence(fields.get("confidence"))
+        reason = short_trace_text(str(fields.get("reason", "")), 90)
+        return f"Маршрут: {action}, роль {role}, уверенность {confidence}. {reason}"
+
+    if kind == "orchestrator_decision":
+        role = fields.get("role", "chat")
+        confidence = format_confidence(fields.get("confidence"))
+        reason = short_trace_text(str(fields.get("reason", "")), 90)
+        return f"Оркестратор уточнил роль: {role}, уверенность {confidence}. {reason}"
+
+    if kind == "orchestrator_fallback":
+        reason = short_trace_text(str(fields.get("reason", "")), 90)
+        return f"Оркестратор не помог, беру rule-router. Причина: {reason}"
+
+    if kind == "model_role_selected":
+        role = fields.get("role", "")
+        provider = fields.get("provider", "")
+        model = fields.get("model", "")
+        return f"Модель: {provider}/{model} для роли {role}"
+
+    if kind == "tool_started":
+        return format_tool_started(fields)
+
+    if kind == "command_reply_redirected":
+        command = short_trace_text(str(fields.get("command", "")), 110)
+        return f"Модель вернула команду, выполняю ее: {command}"
+
+    if kind == "tool_finished":
+        tool = fields.get("tool", "tool")
+        ok = "ok" if fields.get("ok") else "ошибка"
+        elapsed = fields.get("elapsed_ms")
+        suffix = f" за {elapsed} ms" if elapsed is not None else ""
+        if tool == "llm_chat":
+            return f"AI ответил: {ok}{suffix}"
+        return f"Инструмент {tool}: {ok}{suffix}"
+
+    if kind == "tool_failed":
+        tool = fields.get("tool", "tool")
+        error = short_trace_text(str(fields.get("error", "")), 90)
+        return f"Инструмент {tool} упал: {error}"
+
+    if kind == "planner_started":
+        return "Планировщик: разбиваю задачу на шаги"
+
+    if kind == "planner_step_started":
+        action = fields.get("action", "step")
+        index = fields.get("index", "")
+        return f"Шаг {index}: {action}"
+
+    if kind == "planner_step_finished":
+        action = fields.get("action", "step")
+        index = fields.get("index", "")
+        return f"Шаг {index} завершён: {action}"
+
+    if kind == "task_finished":
+        files = fields.get("files") if isinstance(fields.get("files"), list) else []
+        return f"Готово: отправляю файлов {len(files)}" if files else "Готово: отправляю ответ"
+
+    if kind == "task_failed":
+        error = short_trace_text(str(fields.get("error", "")), 100)
+        return f"Задача упала: {error}"
+
+    return ""
+
+
+def format_tool_started(fields: dict[str, Any]) -> str:
+    tool = str(fields.get("tool", "tool"))
+    args = fields.get("args") if isinstance(fields.get("args"), dict) else {}
+    if tool == "web_search":
+        query = short_trace_text(str(args.get("query", "")), 110)
+        return f"Ищу в интернете: {query}"
+    if tool == "web_fetch":
+        url = short_trace_text(str(args.get("url", "")), 110)
+        return f"Читаю источник: {url}"
+    if tool == "browser_read":
+        url = short_trace_text(str(args.get("url", "")), 110)
+        return f"Открываю в браузере: {url}"
+    if tool == "llm_chat":
+        provider = str(args.get("provider", "")).strip()
+        model = str(args.get("model", "")).strip()
+        label = f"{provider}/{model}".strip("/")
+        return f"Спрашиваю AI: {label}" if label else "Спрашиваю AI"
+    if tool == "download_audio":
+        fmt = str(args.get("fmt", "")).strip()
+        urls = args.get("urls", [])
+        count = len(urls) if isinstance(urls, list) else 1
+        return f"Скачиваю аудио: {count} ссылок, формат {fmt or 'mp3'}"
+    if tool.startswith("convert_"):
+        path = short_trace_text(str(args.get("path", "")), 90)
+        return f"Конвертирую документ: {path}"
+    return f"Запускаю инструмент: {tool}"
+
+
+def format_confidence(value: Any) -> str:
+    try:
+        return f"{float(value) * 100:.0f}%"
+    except (TypeError, ValueError):
+        return "?"
+
+
+def short_trace_text(text: str, limit: int = 120) -> str:
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
 
 
 def chunks(values: list[int], size: int) -> list[list[int]]:

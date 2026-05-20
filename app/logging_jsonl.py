@@ -11,6 +11,7 @@ class JsonlLogger:
     def __init__(self, path: Path):
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._ensure_utf8_bom()
 
     def event(self, kind: str, **fields: Any) -> None:
         payload = {
@@ -24,3 +25,11 @@ class JsonlLogger:
     def exception(self, kind: str, exc: BaseException, **fields: Any) -> None:
         self.event(kind, error=str(exc), traceback=traceback.format_exc(), **fields)
 
+    def _ensure_utf8_bom(self) -> None:
+        if not self.path.exists():
+            self.path.write_bytes(b"\xef\xbb\xbf")
+            return
+        data = self.path.read_bytes()
+        if data.startswith(b"\xef\xbb\xbf"):
+            return
+        self.path.write_bytes(b"\xef\xbb\xbf" + data)

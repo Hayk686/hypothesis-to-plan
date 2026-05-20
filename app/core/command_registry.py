@@ -11,6 +11,7 @@ from app.core.llm_turn import run_llm_turn
 from app.core.memory import with_recent_context
 from app.core.model_orchestrator import format_model_roles, reset_role_models, save_role_model
 from app.core.planner import resume_latest_workflow
+from app.core.role_prompts import role_system_prompt
 from app.core.tool_registry import ToolContext, ToolRegistry
 from app.core.types import Outgoing
 from app.tools.llm import llm_status
@@ -20,14 +21,16 @@ from app.tools.models import format_active_model, normalize_provider
 
 CommandHandler = Callable[["CommandContext"], Outgoing]
 
-CHAT_SYSTEM_PROMPT = (
+CHAT_SYSTEM_PROMPT_FALLBACK = (
     "Ты локальный Telegram-ассистент владельца. "
     "Отвечай на языке пользователя: русском, армянском или английском. "
     "Пиши кратко, естественно и честно. "
-    "Если для ответа нужна свежая информация из интернета, скажи использовать /research <запрос>."
+    "Не отправляй пользователю slash-команды как финальный ответ. "
+    "Если вопрос можно объяснить из общих знаний, отвечай сразу. "
+    "Если нужна свежая информация из интернета, скажи это обычными словами; runtime сам выберет web/research маршрут."
 )
 
-RESEARCH_SYSTEM_PROMPT = (
+RESEARCH_SYSTEM_PROMPT_FALLBACK = (
     "Ты research-ассистент. Отвечай на языке пользователя. "
     "Используй только предоставленные источники, не выдумывай факты. "
     "Дай короткий вывод и укажи ссылки на источники по номерам вида [1], [2]."
@@ -201,6 +204,15 @@ def build_command_registry() -> CommandRegistry:
         requires_input=True,
         input_prompt="Пришли ссылку на страницу.",
     )
+    registry.register("verify", "Проверить ссылку", _verify_url, show_in_menu=False)
+    registry.register(
+        "browser",
+        "Open a page in browser",
+        _browser,
+        examples=("/browser https://example.com",),
+        requires_input=True,
+        input_prompt="Send a URL to open in the browser. Use: screenshot <url> for a screenshot.",
+    )
     registry.register(
         "ask",
         "Спросить ИИ",
@@ -226,6 +238,8 @@ def _help(context: CommandContext) -> Outgoing:
 
 def _status(context: CommandContext) -> Outgoing:
     config = context.tool_context.config
+    browser_result = context.registry.run("browser_status", context.tool_context)
+    browser_line = browser_result.message or ("browser: available" if browser_result.ok else "browser: unavailable")
     return Outgoing(
         text=(
             "runtime: ok\n"
@@ -237,7 +251,7 @@ def _status(context: CommandContext) -> Outgoing:
             "memory: enabled\n"
             "artifacts: enabled\n"
             "web: available (search/fetch)\n"
-            "browser: not connected yet\n"
+            f"{browser_line}\n"
             f"tools: {', '.join(context.registry.names())}"
         )
     )
@@ -427,10 +441,13 @@ def _chat(context: CommandContext) -> Outgoing:
         context.registry,
         context.tool_context,
         prompt=prompt,
-        system=_system_with_context(CHAT_SYSTEM_PROMPT, prompt, context),
+        system=_system_with_context(system_prompt_for_selected_role(context, prompt), prompt, context),
         role=selected_llm_role(context, prompt),
     )
     if result.ok:
+        command_outgoing = command_reply_outgoing(context, result.message)
+        if command_outgoing:
+            return command_outgoing
         if len(result.message.strip()) >= 300:
             context.tool_context.metadata["artifact"] = {
                 "kind": "answer",
@@ -450,10 +467,13 @@ def _ask(context: CommandContext) -> Outgoing:
         context.registry,
         context.tool_context,
         prompt=prompt,
-        system=_system_with_context(CHAT_SYSTEM_PROMPT, prompt, context),
+        system=_system_with_context(system_prompt_for_selected_role(context, prompt), prompt, context),
         role=selected_llm_role(context, prompt),
     )
     if result.ok:
+        command_outgoing = command_reply_outgoing(context, result.message)
+        if command_outgoing:
+            return command_outgoing
         context.tool_context.metadata["artifact"] = {
             "kind": "answer",
             "title": prompt,
@@ -496,28 +516,130 @@ def _fetch(context: CommandContext) -> Outgoing:
     return Outgoing(text=clamp_text(result.message or "Fetch failed."))
 
 
+def _verify_url(context: CommandContext) -> Outgoing:
+    url = first_url(command_args(context.text))
+    if not url:
+        return Outgoing(text="Пришли ссылку, которую нужно проверить.")
+
+    terms = active_verification_terms(context)
+    if not terms:
+        return Outgoing(text="Не понял, с какими данными сравнивать эту ссылку.")
+
+    result = context.registry.run("web_fetch", context.tool_context, url=url, max_chars=20000)
+    used_tool = "web_fetch"
+    if result.ok:
+        title = result.raw.get("title", "") or url
+        text = result.raw.get("text", "") or result.message
+    else:
+        browser_result = context.registry.run(
+            "browser_read",
+            context.tool_context,
+            url=url,
+            max_chars=20000,
+            screenshot=False,
+        )
+        if not browser_result.ok:
+            return Outgoing(
+                text=(
+                    "Не смог проверить ссылку напрямую.\n"
+                    f"web_fetch: {result.message or 'failed'}\n"
+                    f"browser_read: {browser_result.message or 'failed'}"
+                )
+            )
+        result = browser_result
+        used_tool = "browser_read"
+        title = result.raw.get("title", "") or url
+        text = result.raw.get("text", "") or result.message
+
+    haystack = page_match_text(title, text)
+    found = [term for term in terms if term in haystack]
+    missing = [term for term in terms if term not in haystack]
+
+    if unreliable_page_check(url, title, text, found):
+        answer = (
+            "Не смог надёжно проверить страницу: похоже, сайт не отдал публичное содержимое профиля. "
+            "Нужно открыть её через browser/авторизованный доступ или прислать текст/скрин."
+        )
+    elif missing:
+        answer = "Не подходит. В прочитанной странице не нашёл: " + ", ".join(missing)
+        if found:
+            answer += "\nНашёл: " + ", ".join(found)
+    else:
+        answer = f"Да, эта ссылка подходит: {url}"
+
+    context.tool_context.metadata["artifact"] = {
+        "kind": "url_check",
+        "title": url,
+        "text": answer,
+        "urls": [url],
+        "metadata": {"terms": terms, "found": found, "missing": missing, "tool": used_tool},
+    }
+    return Outgoing(text=clamp_text(answer))
+
+
+def _browser(context: CommandContext) -> Outgoing:
+    args = command_args(context.text)
+    if not args:
+        return Outgoing(text="Write: /browser <url> or /browser screenshot <url>")
+
+    screenshot = browser_wants_screenshot(args)
+    url = browser_url_from_args(args)
+    if not url:
+        return Outgoing(text="Write: /browser <url> or /browser screenshot <url>")
+
+    result = context.registry.run(
+        "browser_read",
+        context.tool_context,
+        url=url,
+        max_chars=3200,
+        screenshot=screenshot,
+    )
+    if result.ok:
+        context.tool_context.metadata["artifact"] = {
+            "kind": "browser_page",
+            "title": result.raw.get("title") or url,
+            "text": result.raw.get("text") or result.message,
+            "files": result.files,
+            "urls": [url, *[item.get("url", "") for item in result.raw.get("links", []) if item.get("url")]],
+            "metadata": {"url": result.raw.get("url") or url, "screenshot": screenshot},
+        }
+        return Outgoing(text=clamp_text(result.message or "Browser read finished."), files=result.files, cleanup_files=result.files)
+    return Outgoing(text=result.message or "Browser read failed.")
+
+
 def _research(context: CommandContext) -> Outgoing:
-    query = command_args(context.text)
+    query = resolve_research_query(command_args(context.text), context)
     if not query:
         return Outgoing(text="Напиши так: /research <запрос>")
 
-    search_result = context.registry.run("web_search", context.tool_context, query=query, limit=5)
+    if ambiguous_link_format_request(query):
+        return Outgoing(text="Какой формат нужен: одна проверенная ссылка, несколько ссылок, или краткий вывод с источниками?")
+
+    single_link = single_link_request(query)
+    search_query = " ".join(single_link_terms(query)) if single_link else query
+    search_result = context.registry.run("web_search", context.tool_context, query=search_query or query, limit=8 if single_link else 5)
     if not search_result.ok:
         return Outgoing(text=search_result.message or "Search failed.")
 
     results = search_result.raw.get("results", [])
     source_blocks = []
     source_lines = []
-    for index, item in enumerate(results[:3], 1):
+    source_records = []
+    source_limit = 8 if single_link else 3
+    for index, item in enumerate(results[:source_limit], 1):
         title = item.get("title", "Untitled")
         url = item.get("url", "")
         source_lines.append(f"[{index}] {title}\n{url}")
-        fetch_result = context.registry.run("web_fetch", context.tool_context, url=url, max_chars=3500)
+        fetch_result = context.registry.run("web_fetch", context.tool_context, url=url, max_chars=20000 if single_link else 3500)
         if fetch_result.ok:
             text = fetch_result.raw.get("text", "")
         else:
             text = item.get("snippet", "")
+        source_records.append({"item": item, "fetch_ok": fetch_result.ok, "fetch_message": fetch_result.message, "text": text})
         source_blocks.append(f"[{index}] {title}\nURL: {url}\nTEXT:\n{text}")
+
+    if single_link:
+        return single_link_research_outgoing(context, query, results, source_records)
 
     prompt = (
         f"Запрос пользователя: {query}\n\n"
@@ -529,7 +651,7 @@ def _research(context: CommandContext) -> Outgoing:
         context.registry,
         context.tool_context,
         prompt=prompt,
-        system=_system_with_context(RESEARCH_SYSTEM_PROMPT, query, context),
+        system=_system_with_context(role_system_prompt(context.root, "research", RESEARCH_SYSTEM_PROMPT_FALLBACK), query, context),
         temperature=0.2,
         language_text=query,
         role="research",
@@ -559,6 +681,225 @@ def _research(context: CommandContext) -> Outgoing:
         "metadata": {"query": query, "llm_error": llm_result.message},
     }
     return Outgoing(text=clamp_text(fallback))
+
+
+def single_link_request(query: str) -> bool:
+    lowered = query.lower()
+    markers = (
+        "только одну",
+        "одну конкретную",
+        "одну ссылку",
+        "только ссылку",
+        "только url",
+        "только один url",
+        "один url",
+        "one link",
+        "single link",
+        "only one link",
+        "just one link",
+        "only the url",
+        "only url",
+    )
+    return any(marker in lowered for marker in markers)
+
+
+def multiple_links_request(query: str) -> bool:
+    lowered = query.lower()
+    markers = (
+        "несколько ссыл",
+        "список ссыл",
+        "ссылки",
+        "источники",
+        "с источниками",
+        "links",
+        "sources",
+        "multiple links",
+        "several links",
+        "list of links",
+    )
+    if any(marker in lowered for marker in markers):
+        return True
+    return bool(re.search(r"\b\d+\s+(?:ссыл|links?|sources?)", lowered))
+
+
+def ambiguous_link_format_request(query: str) -> bool:
+    lowered = query.lower()
+    if single_link_request(query) or multiple_links_request(query):
+        return False
+    markers = (
+        "ссылку",
+        "ссылка",
+        "линк",
+        "url",
+        "link",
+    )
+    return any(marker in lowered for marker in markers)
+
+
+def single_link_research_outgoing(
+    context: CommandContext,
+    query: str,
+    results: list[dict],
+    source_records: list[dict],
+) -> Outgoing:
+    terms = single_link_terms(query)
+    url = verified_single_link(source_records, terms)
+    if url:
+        text = url
+    else:
+        if terms:
+            text = "Не нашёл проверенную ссылку, где в прочитанном источнике есть все данные: " + ", ".join(terms)
+        else:
+            text = "Не понял, какие данные нужно проверить для одной конкретной ссылки."
+
+    context.tool_context.metadata["artifact"] = {
+        "kind": "research",
+        "title": query,
+        "text": text,
+        "urls": [item.get("url", "") for item in results[:5] if item.get("url")],
+        "metadata": {"query": query, "single_link": True, "terms": terms},
+    }
+    return Outgoing(text=clamp_text(text))
+
+
+def verified_single_link(source_records: list[dict], terms: list[str]) -> str:
+    if not terms:
+        return ""
+
+    for record in source_records:
+        if not record.get("fetch_ok"):
+            continue
+        item = record.get("item", {})
+        url = item.get("url", "")
+        haystack = source_match_text(record)
+        if url and all(term in haystack for term in terms):
+            return url
+    return ""
+
+
+def source_match_text(record: dict) -> str:
+    item = record.get("item", {})
+    text = " ".join(
+        (
+            item.get("title", ""),
+            item.get("url", ""),
+            item.get("snippet", ""),
+            record.get("text", ""),
+        )
+    )
+    return re.sub(r"\s+", " ", text.lower())
+
+
+def single_link_terms(query: str) -> list[str]:
+    stopwords = {
+        "a",
+        "an",
+        "and",
+        "for",
+        "from",
+        "find",
+        "give",
+        "has",
+        "have",
+        "internet",
+        "link",
+        "one",
+        "only",
+        "search",
+        "send",
+        "single",
+        "that",
+        "the",
+        "these",
+        "this",
+        "url",
+        "web",
+        "with",
+        "в",
+        "все",
+        "всё",
+        "где",
+        "дай",
+        "данные",
+        "есть",
+        "имеет",
+        "интернете",
+        "которая",
+        "конкретная",
+        "конкретную",
+        "найди",
+        "один",
+        "одна",
+        "одну",
+        "отправь",
+        "поищи",
+        "поиск",
+        "ссылка",
+        "ссылку",
+        "только",
+        "эти",
+        "эта",
+        "это",
+    }
+    terms = []
+    for token in re.findall(r"[A-Za-zА-Яа-яЁё]+|\d{2,}", query.lower()):
+        if token in stopwords:
+            continue
+        if len(token) < 3 and not token.isdigit():
+            continue
+        if token not in terms:
+            terms.append(token)
+    return terms[:12]
+
+
+def active_verification_terms(context: CommandContext) -> list[str]:
+    store = context.tool_context.artifact_store
+    if not store:
+        return []
+    artifact = store.resolve(context.tool_context.artifact_key)
+    if not artifact:
+        return []
+
+    metadata = artifact.metadata or {}
+    raw_terms = metadata.get("terms")
+    if isinstance(raw_terms, list):
+        terms = [str(term).strip().lower() for term in raw_terms if str(term).strip()]
+        if terms:
+            return terms[:12]
+
+    query = str(metadata.get("query") or artifact.title or "")
+    if single_link_request(query):
+        return single_link_terms(query)
+    return []
+
+
+def page_match_text(title: str, text: str) -> str:
+    value = f"{title}\n{text}".lower().replace("\x00", " ")
+    return re.sub(r"\s+", " ", value)
+
+
+def unreliable_page_check(url: str, title: str, text: str, found_terms: list[str]) -> bool:
+    lowered_url = url.lower()
+    haystack = page_match_text(title, text)
+    gated_site = any(domain in lowered_url for domain in ("linkedin.com", "researchgate.net", "facebook.com", "instagram.com"))
+    if not gated_site:
+        return False
+    gated_markers = (
+        "sign in",
+        "join linkedin",
+        "login",
+        "log in",
+        "authwall",
+        "captcha",
+        "forbidden",
+        "403",
+        "page not found",
+        "can’t seem to find the page",
+        "can't seem to find the page",
+        "404",
+        "enable javascript",
+    )
+    return len(found_terms) < 2 and any(marker in haystack for marker in gated_markers)
 
 
 def _download_audio(context: CommandContext) -> Outgoing:
@@ -611,6 +952,118 @@ def format_search_items(results: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def command_reply_outgoing(context: CommandContext, message: str) -> Outgoing | None:
+    command = command_reply_text(message)
+    if not command:
+        return None
+    task_logger = getattr(context.tool_context, "logger", None)
+    if task_logger and hasattr(task_logger, "event"):
+        task_logger.event("command_reply_redirected", task_id=context.tool_context.task_id, command=command)
+    return context.commands.run(command, context.root, context.registry, context.tool_context)
+
+
+def system_prompt_for_selected_role(context: CommandContext, prompt: str) -> str:
+    role = selected_llm_role(context, prompt)
+    fallback = CHAT_SYSTEM_PROMPT_FALLBACK
+    return role_system_prompt(context.root, role, fallback)
+
+
+def command_reply_text(message: str) -> str:
+    text = message.strip()
+    if text.startswith("```") and text.endswith("```"):
+        text = re.sub(r"^```(?:text|plain)?\s*", "", text, flags=re.IGNORECASE).strip()
+        text = re.sub(r"\s*```$", "", text).strip()
+    if "\n" in text:
+        return ""
+    match = re.fullmatch(r"/(research|search|fetch|browser)\s+(.+)", text, flags=re.IGNORECASE | re.DOTALL)
+    if not match:
+        return ""
+    args = match.group(2).strip()
+    if not args:
+        return ""
+    return f"/{match.group(1).lower()} {args}"
+
+
+def resolve_research_query(query: str, context: CommandContext) -> str:
+    query = query.strip()
+    if not query:
+        return ""
+
+    lowered = query.lower()
+    if not weak_reference_query(lowered):
+        return query
+
+    target = latest_search_target(context)
+    if not target:
+        return query
+
+    if any(marker in lowered for marker in ("найди", "поищи", "поиск", "research", "find", "search")):
+        return target
+    return f"{query} {target}"
+
+
+def weak_reference_query(lowered: str) -> bool:
+    stripped = re.sub(r"\s+", " ", lowered).strip(" .,!?:;")
+    references = ("его", "ее", "её", "это", "этого", "тот", "та", "он", "она", "him", "her", "it", "that")
+    if stripped in references:
+        return True
+    if len(stripped.split()) <= 4 and any(ref in stripped.split() for ref in references):
+        return True
+    return any(phrase in stripped for phrase in ("найди его", "найди её", "найди ее", "find him", "find her"))
+
+
+def latest_search_target(context: CommandContext) -> str:
+    candidates = []
+    candidates.extend(extract_recent_user_lines(context.tool_context.memory_context))
+    store = context.tool_context.artifact_store
+    if store:
+        artifact = store.resolve(context.tool_context.artifact_key)
+        if artifact:
+            candidates.append(artifact.title)
+            candidates.append(artifact.text[:500])
+
+    for candidate in reversed(candidates):
+        target = extract_named_query(candidate)
+        if target:
+            return target
+    return ""
+
+
+def extract_recent_user_lines(memory_context: str) -> list[str]:
+    lines = []
+    for line in memory_context.splitlines():
+        marker = "- user:"
+        if marker not in line:
+            continue
+        lines.append(line.split(marker, 1)[1].strip())
+    return lines
+
+
+def extract_named_query(text: str) -> str:
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return ""
+
+    hayk = re.search(r"Hayk\s+Hovhannisyan(?:\s+NPUA)?(?:\s+nuclear\s+engineering)?", text, re.IGNORECASE)
+    if hayk:
+        return hayk.group(0).strip()
+
+    quoted = re.search(r"[\"'«“]([^\"'»”]{4,120})[\"'»”]", text)
+    if quoted:
+        return quoted.group(1).strip()
+
+    if any(marker in text.lower() for marker in ("кто такой", "найди", "поищи", "research", "find", "search")):
+        cleaned = re.sub(
+            r"(?i)\b(кто такой|найди|поищи|поиск|research|find|search|look up|так|его|ее|её|это|про|about)\b",
+            " ",
+            text,
+        )
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,.!?:;")
+        if 4 <= len(cleaned) <= 120:
+            return cleaned
+    return ""
+
+
 def selected_llm_role(context: CommandContext, prompt: str) -> str:
     role = str(context.tool_context.metadata.get("selected_role", "")).strip()
     return role or infer_llm_role(prompt)
@@ -623,7 +1076,6 @@ def infer_llm_role(text: str) -> str:
         for marker in (
             "review",
             "check",
-            "critic",
             "improve",
             "quality",
             "errors",
@@ -637,7 +1089,7 @@ def infer_llm_role(text: str) -> str:
             "ревью",
         )
     ) and not any(marker in lowered for marker in ("fix", "implement", "почини", "исправь", "реализуй")):
-        return "critic"
+        return "chat"
     if any(
         marker in lowered
         for marker in (
@@ -689,6 +1141,23 @@ def infer_llm_role(text: str) -> str:
 def command_args(text: str) -> str:
     parts = text.strip().split(maxsplit=1)
     return parts[1].strip() if len(parts) > 1 else ""
+
+
+def browser_wants_screenshot(args: str) -> bool:
+    lowered = args.lower()
+    first = args.strip().split(maxsplit=1)[0].lower() if args.strip() else ""
+    return first in {"screenshot", "shot", "screen"} or "screenshot" in lowered or "скриншот" in lowered
+
+
+def browser_url_from_args(args: str) -> str:
+    url = first_url(args)
+    if url:
+        return url
+    cleaned = re.sub(r"^(open|read|screenshot|shot|screen)\s+", "", args.strip(), flags=re.IGNORECASE).strip()
+    first = cleaned.split(maxsplit=1)[0].strip(".,)]}") if cleaned else ""
+    if re.fullmatch(r"[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/\S*)?", first):
+        return "https://" + first
+    return ""
 
 
 def first_url(text: str) -> str:
