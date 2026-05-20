@@ -258,6 +258,9 @@ function extractJson(text: string): unknown {
 }
 
 function asStringArray(v: unknown): string[] {
+  if (typeof v === "string") {
+    return v.split(",").map((s) => s.trim()).filter(Boolean);
+  }
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
 
@@ -267,7 +270,8 @@ function normalizePlan(raw: unknown, project: LlmProjectInput): LlmPlan {
   const novelty = (obj.novelty_assessment ?? {}) as Record<string, unknown>;
   const strategy = (obj.experimental_strategy ?? {}) as Record<string, unknown>;
   const validation = (obj.validation_plan ?? {}) as Record<string, unknown>;
-  const primary = (validation.primary_metric ?? {}) as Record<string, unknown>;
+  const primaryVal = validation.primary_metric;
+  const primary = (typeof primaryVal === "object" && primaryVal ? primaryVal : {}) as Record<string, unknown>;
   const judge = (obj.judge_presentation_view ?? {}) as Record<string, unknown>;
 
   const timeline = Array.isArray(obj.timeline)
@@ -277,7 +281,7 @@ function normalizePlan(raw: unknown, project: LlmProjectInput): LlmPlan {
           week: typeof r.week === "number" ? r.week : idx + 1,
           phase: typeof r.phase === "string" ? r.phase : "Execution",
           milestone: typeof r.milestone === "string" ? r.milestone : "Milestone",
-          tasks: asStringArray(r.tasks).slice(0, 6),
+          tasks: asStringArray(r.tasks ?? r.task).slice(0, 6),
           deliverable: typeof r.deliverable === "string" ? r.deliverable : "Deliverable",
         };
       })
@@ -300,6 +304,13 @@ function normalizePlan(raw: unknown, project: LlmProjectInput): LlmPlan {
 
   const secondaryMetrics = Array.isArray(validation.secondary_metrics)
     ? validation.secondary_metrics.map((row) => {
+        if (typeof row === "string") {
+          return {
+            name: row,
+            target: "Defined before execution",
+            method: "Appropriate assay",
+          };
+        }
         const r = (row ?? {}) as Record<string, unknown>;
         return {
           name: typeof r.name === "string" ? r.name : "Secondary metric",
@@ -308,6 +319,15 @@ function normalizePlan(raw: unknown, project: LlmProjectInput): LlmPlan {
         };
       })
     : [];
+
+  const primaryMetric =
+    typeof primaryVal === "string"
+      ? { name: primaryVal, target: "Pre-registered threshold", method: "Direct measurement" }
+      : {
+          name: typeof primary.name === "string" ? primary.name : "Primary endpoint",
+          target: typeof primary.target === "string" ? primary.target : "Pre-registered threshold",
+          method: typeof primary.method === "string" ? primary.method : "Direct measurement",
+        };
 
   return {
     project_title: typeof obj.project_title === "string" ? obj.project_title : project.title,
@@ -334,11 +354,7 @@ function normalizePlan(raw: unknown, project: LlmProjectInput): LlmPlan {
     },
     timeline,
     validation_plan: {
-      primary_metric: {
-        name: typeof primary.name === "string" ? primary.name : "Primary endpoint",
-        target: typeof primary.target === "string" ? primary.target : "Pre-registered threshold",
-        method: typeof primary.method === "string" ? primary.method : "Direct measurement",
-      },
+      primary_metric: primaryMetric,
       secondary_metrics: secondaryMetrics,
       statistical_approach:
         typeof validation.statistical_approach === "string"
