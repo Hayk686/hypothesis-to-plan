@@ -118,7 +118,7 @@ function buildPrompt(
 
   return JSON.stringify(
     {
-      task: "Create a source-grounded experimental plan. Use the literature and protocols below. Do not invent citations or claims not supported by the supplied sources. Keep required_materials as specific component or chemical names (e.g. 'DHT22 sensor', 'Arduino Uno', 'FBS', 'Cas9 Enzyme'). Do not use generic system descriptions like 'Temperature control system'. Return only valid JSON matching the requested shape.",
+      task: "Create a source-grounded experimental plan. Use the literature and protocols below. Do not invent citations or claims not supported by the sources. For required_materials, you MUST use exact, specific chemical or component names (e.g. 'Graphene', 'Lithium iron phosphate', 'DHT22 sensor', 'FBS'). DO NOT use generic descriptive phrases (e.g. 'Graphene precursor', 'electrode material', 'control system'). Return only valid JSON matching the requested shape.",
       project,
       agent_profile: {
         domain_kind: agentProfile.kind,
