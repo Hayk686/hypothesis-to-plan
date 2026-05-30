@@ -260,6 +260,17 @@ const REGISTRY: RegistryEntry[] = [
     unit_cost: 30.0,
     pack_size: "1 month",
   },
+  {
+    key: "Environmental Chamber",
+    aliases: ["controlled environment chambers", "environmental chamber", "incubator", "plant growth chamber"],
+    supplier: "Thermo Fisher Scientific",
+    product: "Precision Plant Growth Chamber",
+    catalog: "PR205045M",
+    category: "equipment",
+    source_url: "https://www.thermofisher.com/order/catalog/product/PR205045M",
+    unit_cost: 4500,
+    pack_size: "1 unit",
+  },
 ];
 
 const GENERIC_NON_PURCHASABLE_TERMS = new Set([
@@ -278,6 +289,10 @@ const GENERIC_NON_PURCHASABLE_TERMS = new Set([
   "software",
   "code",
   "source code",
+  "degradation assays",
+  "microbial inoculants",
+  "assays",
+  "bacterial strains",
 ]);
 
 function normalizeTerms(input: ResolveInput): string[] {
