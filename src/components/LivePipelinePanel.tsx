@@ -298,10 +298,10 @@ export function LivePipelinePanel({ project, livePlan, onResult }: Props) {
       )}
 
       {/* Dev debug panel */}
-      {isDev && livePlan && (
+      {livePlan && (
         <details className="mt-4 rounded-md border border-dashed border-border/60 bg-muted/30 p-3">
           <summary className="cursor-pointer font-mono text-[11px] text-muted-foreground">
-            Dev · /api/generate-plan debug
+            /api/generate-plan debug
           </summary>
           <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[10px] text-foreground/75">
             {JSON.stringify(livePlan.debug, null, 2)}
