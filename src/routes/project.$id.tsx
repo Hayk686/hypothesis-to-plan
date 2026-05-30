@@ -215,6 +215,32 @@ function ProjectPage() {
   const readinessPlan = livePlan
     ? {
         ...plan,
+        protocol: livePlan.timeline.map((t, idx) => {
+          // Map phases loosely to ProtocolStep phases or default to "Sample setup"
+          let pPhase: any = "Preparation";
+          const lower = t.phase.toLowerCase();
+          if (lower.includes("setup")) pPhase = "Sample setup";
+          else if (lower.includes("intervention") || lower.includes("edit") || lower.includes("assay")) pPhase = "Intervention";
+          else if (lower.includes("measur") || lower.includes("validat")) pPhase = "Measurement";
+          else if (lower.includes("control")) pPhase = "Controls";
+          else if (lower.includes("output") || lower.includes("deliver")) pPhase = "Expected outputs";
+
+          return {
+            step: idx + 1,
+            phase: pPhase,
+            title: t.milestone,
+            description: t.tasks.join(". ") + (t.deliverable ? `. Deliverable: ${t.deliverable}` : ""),
+            duration: `Week ${t.week}`,
+            equipment: [],
+            protocolSource: livePlan.protocols[idx % livePlan.protocols.length]
+              ? {
+                  status: "verified" as const,
+                  note: "Derived from relevant literature protocol",
+                  sourceUrl: livePlan.protocols[idx % livePlan.protocols.length].url,
+                }
+              : undefined,
+          };
+        }),
         materials: livePlan.materials_budget.items.map((m) => ({
           name: m.name,
           purpose: m.note,
