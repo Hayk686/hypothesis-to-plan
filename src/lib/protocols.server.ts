@@ -199,11 +199,11 @@ function buildQueryVariants(input: ProtocolsInput, primary: string): string[] {
   }
 
   const candidates: { match: RegExp; q: string }[] = [
-    { match: /cryo|freez|thaw|trehalose|dmso/, q: "cell cryopreservation" },
+    { match: /trehalose/, q: "trehalose cell freezing" },
+    { match: /cryo|freez|thaw|dmso/, q: "cell cryopreservation" },
     { match: /hela|cell|culture/, q: "HeLa cell culture" },
     { match: /thaw|cryo|freez/, q: "cell thawing" },
     { match: /viability|assay|trypan|count/, q: "cell viability assay" },
-    { match: /trehalose/, q: "trehalose cell freezing" },
   ];
   for (const c of candidates) {
     if (!c.match.test(text)) continue;

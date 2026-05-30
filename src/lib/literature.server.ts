@@ -221,10 +221,9 @@ function buildQueryVariants(input: LiteratureInput, primary: string): string[] {
   }
 
   const candidates: { match: RegExp; q: string }[] = [
-    { match: /trehalose|cryo|freez|thaw|dmso/, q: "trehalose cryopreservation cell viability" },
-    { match: /trehalose|dmso|cryo/, q: "trehalose DMSO cryopreservation" },
-    { match: /hela|cell|cryo|freez/, q: "HeLa cell cryopreservation DMSO viability" },
-    { match: /trehalose|thaw|viability/, q: "trehalose cells post-thaw viability" },
+    { match: /trehalose/, q: "trehalose cryopreservation cell viability" },
+    { match: /cryo|freez|thaw|dmso/, q: "cell cryopreservation viability" },
+    { match: /hela|cell|cryo|freez/, q: "HeLa cell cryopreservation viability" },
     { match: /viability|assay|trypan/, q: "cell viability assay trypan blue" },
     { match: /cell|culture|hela/, q: "mammalian cell culture cryopreservation" },
   ];

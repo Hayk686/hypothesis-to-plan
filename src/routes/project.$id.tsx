@@ -400,9 +400,9 @@ function ProjectPage() {
                 variant="outline"
                 className="shrink-0 gap-1 border-primary/40 bg-primary/10 font-mono text-[10px] uppercase tracking-wider text-primary"
               >
-                <FileSearch className="h-3 w-3" /> Literature QC: {plan.literatureQc.result}
+                <FileSearch className="h-3 w-3" /> Literature QC: {livePlan ? livePlan.literature_qc.result : plan.literatureQc.result}
               </Badge>
-              <span className="min-w-0 flex-1 text-foreground/80">{plan.literatureQc.reason}</span>
+              <span className="min-w-0 flex-1 text-foreground/80">{livePlan ? livePlan.literature_qc.reason : plan.literatureQc.reason}</span>
             </div>
           ) : (
             <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
@@ -1179,98 +1179,122 @@ function ProjectPage() {
 
           {/* VALIDATION */}
           <TabsContent value="validation" className="mt-6 space-y-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <SectionHeader
-                title="Validation plan"
-                subtitle="Primary endpoint, secondary metrics, statistical approach, controls, reproducibility"
-              />
-              <VerificationBadge verification={plan.validation.source} />
-            </div>
+            {(() => {
+              const vPlan = livePlan?.validation_plan ? {
+                primaryMetric: {
+                  name: (livePlan as any).validation_plan.primary_metric.name,
+                  target: (livePlan as any).validation_plan.primary_metric.target,
+                  method: (livePlan as any).validation_plan.primary_metric.method,
+                },
+                secondaryMetrics: (livePlan as any).validation_plan.secondary_metrics.map((sm: any) => ({
+                  name: sm.name,
+                  target: sm.target,
+                  method: sm.method
+                })),
+                statisticalApproach: (livePlan as any).validation_plan.statistical_approach,
+                reproducibilityChecks: (livePlan as any).validation_plan.reproducibility_checks,
+                positiveControl: (livePlan as any).validation_plan.positive_control,
+                negativeControl: (livePlan as any).validation_plan.negative_control,
+                source: (livePlan as any).warnings?.uses_fallback_llm ? { status: "pending" as const } : { status: "verified" as const, note: "LLM Generated" },
+              } : plan.validation;
 
-            <Card className="border-primary/30 bg-primary/5 p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <Target className="h-4 w-4 text-primary" />
-                <h3 className="font-display text-base font-semibold text-primary">
-                  Primary success metric
-                </h3>
-              </div>
-              <div className="font-medium">{plan.validation.primaryMetric.name}</div>
-              <div className="mt-2 grid gap-3 md:grid-cols-2">
-                <div className="rounded-md border border-border/60 bg-background/60 p-3">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Target
+              return (
+                <>
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <SectionHeader
+                      title="Validation plan"
+                      subtitle="Primary endpoint, secondary metrics, statistical approach, controls, reproducibility"
+                    />
+                    <VerificationBadge verification={vPlan.source} />
                   </div>
-                  <div className="mt-0.5 font-mono text-primary">
-                    {plan.validation.primaryMetric.target}
+
+                  <Card className="border-primary/30 bg-primary/5 p-6">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Target className="h-4 w-4 text-primary" />
+                      <h3 className="font-display text-base font-semibold text-primary">
+                        Primary success metric
+                      </h3>
+                    </div>
+                    <div className="font-medium">{vPlan.primaryMetric.name}</div>
+                    <div className="mt-2 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-md border border-border/60 bg-background/60 p-3">
+                        <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                          Target
+                        </div>
+                        <div className="mt-0.5 font-mono text-primary">
+                          {vPlan.primaryMetric.target}
+                        </div>
+                      </div>
+                      <div className="rounded-md border border-border/60 bg-background/60 p-3">
+                        <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                          Method
+                        </div>
+                        <div className="mt-0.5 text-sm">{vPlan.primaryMetric.method}</div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card className="overflow-hidden border-border/60 bg-card p-0">
+                    <div className="border-b border-border/60 bg-muted/40 px-4 py-3">
+                      <h3 className="font-display text-base font-semibold">Secondary metrics</h3>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Metric</TableHead>
+                          <TableHead>Target</TableHead>
+                          <TableHead>Method</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {vPlan.secondaryMetrics.map((v: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">{v.name}</TableCell>
+                            <TableCell className="font-mono text-sm text-primary">{v.target}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{v.method}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Card>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Card className="border-border/60 bg-gradient-card p-6">
+                      <h3 className="mb-2 font-display text-base font-semibold">Statistical approach</h3>
+                      <p className="text-sm text-foreground/80">{vPlan.statisticalApproach}</p>
+                    </Card>
+                    <Card className="border-border/60 bg-gradient-card p-6">
+                      <h3 className="mb-2 font-display text-base font-semibold">
+                        Reproducibility checks
+                      </h3>
+                      <ul className="space-y-2 text-sm">
+                        {vPlan.reproducibilityChecks.map((c: string, i: number) => (
+                          <li key={i} className="flex gap-2">
+                            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
+                            <span className="text-foreground/80">{c}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </Card>
                   </div>
-                </div>
-                <div className="rounded-md border border-border/60 bg-background/60 p-3">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Method
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Card className="border-success/30 bg-success/5 p-5">
+                      <Badge className="mb-2 bg-success/15 text-success hover:bg-success/20">
+                        Positive control
+                      </Badge>
+                      <p className="text-sm text-foreground/85">{vPlan.positiveControl}</p>
+                    </Card>
+                    <Card className="border-muted/50 bg-muted/20 p-5">
+                      <Badge variant="outline" className="mb-2">
+                        Negative control
+                      </Badge>
+                      <p className="text-sm text-foreground/85">{vPlan.negativeControl}</p>
+                    </Card>
                   </div>
-                  <div className="mt-0.5 text-sm">{plan.validation.primaryMetric.method}</div>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="overflow-hidden border-border/60 bg-card p-0">
-              <div className="border-b border-border/60 bg-muted/40 px-4 py-3">
-                <h3 className="font-display text-base font-semibold">Secondary metrics</h3>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Metric</TableHead>
-                    <TableHead>Target</TableHead>
-                    <TableHead>Method</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {plan.validation.secondaryMetrics.map((v, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{v.name}</TableCell>
-                      <TableCell className="font-mono text-sm text-primary">{v.target}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{v.method}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card className="border-border/60 bg-gradient-card p-6">
-                <h3 className="mb-2 font-display text-base font-semibold">Statistical approach</h3>
-                <p className="text-sm text-foreground/80">{plan.validation.statisticalApproach}</p>
-              </Card>
-              <Card className="border-border/60 bg-gradient-card p-6">
-                <h3 className="mb-2 font-display text-base font-semibold">
-                  Reproducibility checks
-                </h3>
-                <ul className="space-y-2 text-sm">
-                  {plan.validation.reproducibilityChecks.map((c, i) => (
-                    <li key={i} className="flex gap-2">
-                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
-                      <span className="text-foreground/80">{c}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card className="border-success/30 bg-success/5 p-5">
-                <Badge className="mb-2 bg-success/15 text-success hover:bg-success/20">
-                  Positive control
-                </Badge>
-                <p className="text-sm text-foreground/85">{plan.validation.positiveControl}</p>
-              </Card>
-              <Card className="border-muted/50 bg-muted/20 p-5">
-                <Badge variant="outline" className="mb-2">
-                  Negative control
-                </Badge>
-                <p className="text-sm text-foreground/85">{plan.validation.negativeControl}</p>
-              </Card>
-            </div>
+                </>
+              );
+            })()}
           </TabsContent>
 
           {/* RISKS */}
