@@ -91,44 +91,73 @@ type ChatCompletionResponse = {
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const NVIDIA_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
 
-function providerConfig() {
-  const requested = (process.env.LLM_PROVIDER ?? "").trim().toLowerCase();
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  const nvidiaKey = process.env.NVIDIA_API_KEY ?? process.env.NVIDIA_NIM_API_KEY;
+type ProviderMode = "auto" | "nvidia" | "openrouter";
 
-  if (requested === "openrouter" && openRouterKey) {
-    return {
-      provider: "openrouter" as const,
-      apiKey: openRouterKey,
-      endpoint: process.env.OPENROUTER_BASE_URL ?? OPENROUTER_ENDPOINT,
-      model: process.env.OPENROUTER_MODEL ?? "liquid/lfm-2.5-1.2b-instruct:free",
-    };
+function getProviderMode(): ProviderMode {
+  const raw = (process.env.LLM_PROVIDER ?? "").trim().toLowerCase();
+  if (raw === "nvidia" || raw === "openrouter") return raw;
+  return "auto";
+}
+
+function fallbacksEnabled(): boolean {
+  return process.env.LLM_FALLBACKS_ENABLED !== "false";
+}
+
+function hasNvidiaKey(): boolean {
+  return Boolean(process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY);
+}
+
+function hasOpenRouterKey(): boolean {
+  return Boolean(process.env.OPENROUTER_API_KEY);
+}
+
+export type LlmConfig = {
+  provider: "openrouter" | "nvidia";
+  apiKey: string;
+  endpoint: string;
+  model: string;
+};
+
+function getLlmChain(): LlmConfig[] {
+  const mode = getProviderMode();
+  const allowFallbacks = fallbacksEnabled();
+
+  const nvidiaKey = process.env.NVIDIA_API_KEY ?? process.env.NVIDIA_NIM_API_KEY ?? "";
+  const openRouterKey = process.env.OPENROUTER_API_KEY ?? "";
+
+  const nvidia: LlmConfig = {
+    provider: "nvidia" as const,
+    apiKey: nvidiaKey,
+    endpoint: `${(process.env.NVIDIA_BASE_URL ?? "https://integrate.api.nvidia.com/v1").replace(/\/$/, "")}/chat/completions`,
+    model: process.env.NVIDIA_MODEL || "z-ai/glm-5.1",
+  };
+
+  const openrouter: LlmConfig = {
+    provider: "openrouter" as const,
+    apiKey: openRouterKey,
+    endpoint: process.env.OPENROUTER_BASE_URL ?? OPENROUTER_ENDPOINT,
+    model: process.env.OPENROUTER_MODEL || "openai/gpt-oss-120b:free",
+  };
+
+  let chain: LlmConfig[] = [];
+  if (mode === "nvidia") {
+    chain = [nvidia, openrouter];
+  } else if (mode === "openrouter") {
+    chain = [openrouter, nvidia];
+  } else {
+    // auto
+    chain = hasNvidiaKey() ? [nvidia, openrouter] : [openrouter, nvidia];
   }
-  if (requested === "nvidia" && nvidiaKey) {
-    return {
-      provider: "nvidia" as const,
-      apiKey: nvidiaKey,
-      endpoint: `${(process.env.NVIDIA_BASE_URL ?? "https://integrate.api.nvidia.com/v1").replace(/\/$/, "")}/chat/completions`,
-      model: process.env.NVIDIA_MODEL ?? "openai/gpt-oss-20b",
-    };
+
+  if (!allowFallbacks) {
+    chain = chain.slice(0, 1);
   }
-  if (openRouterKey) {
-    return {
-      provider: "openrouter" as const,
-      apiKey: openRouterKey,
-      endpoint: process.env.OPENROUTER_BASE_URL ?? OPENROUTER_ENDPOINT,
-      model: process.env.OPENROUTER_MODEL ?? "liquid/lfm-2.5-1.2b-instruct:free",
-    };
-  }
-  if (nvidiaKey) {
-    return {
-      provider: "nvidia" as const,
-      apiKey: nvidiaKey,
-      endpoint: `${(process.env.NVIDIA_BASE_URL ?? "https://integrate.api.nvidia.com/v1").replace(/\/$/, "")}/chat/completions`,
-      model: process.env.NVIDIA_MODEL ?? "openai/gpt-oss-20b",
-    };
-  }
-  return null;
+
+  return chain.filter((item) => {
+    if (item.provider === "nvidia") return hasNvidiaKey();
+    if (item.provider === "openrouter") return hasOpenRouterKey();
+    return false;
+  });
 }
 
 function buildPrompt(
@@ -419,7 +448,8 @@ async function callChatCompletion({
       body: JSON.stringify({
         model,
         messages,
-        temperature: 0.2,
+        temperature: 0.1,
+        top_p: 0.9,
         max_tokens: 3500,
         response_format: { type: "json_object" },
       }),
@@ -450,9 +480,10 @@ export async function runLlmOrchestrator({
   protocols: NormalizedProtocol[];
   feedback?: LlmFeedbackCorrection[];
 }): Promise<LlmResult> {
-  const config = providerConfig();
+  const chain = getLlmChain();
   const agentProfile = buildAgentProfile(project);
-  if (!config) {
+
+  if (chain.length === 0) {
     return {
       plan: null,
       debug: {
@@ -462,51 +493,103 @@ export async function runLlmOrchestrator({
         status: 0,
         ok: false,
         used_fallback: true,
-        error:
-          "No LLM key configured. Set OPENROUTER_API_KEY or NVIDIA_API_KEY / NVIDIA_NIM_API_KEY.",
+        error: "No LLM key configured. Set OPENROUTER_API_KEY or NVIDIA_API_KEY / NVIDIA_NIM_API_KEY.",
         raw_chars: 0,
       },
     };
   }
 
-  try {
-    const { status, content } = await callChatCompletion({
-      endpoint: config.endpoint,
-      apiKey: config.apiKey,
-      model: config.model,
-      provider: config.provider,
-      messages: [
-        { role: "system", content: systemPrompt() },
-        { role: "user", content: buildPrompt(project, papers, protocols, feedback, agentProfile) },
-      ],
-    });
-    const plan = normalizePlan(extractJson(content), project);
-    return {
-      plan,
-      debug: {
-        provider: config.provider,
-        model: config.model,
+  let lastError = "";
+
+  for (const config of chain) {
+    try {
+      const { status, content } = await callChatCompletion({
         endpoint: config.endpoint,
-        status,
-        ok: true,
-        used_fallback: false,
-        error: null,
-        raw_chars: content.length,
-      },
-    };
-  } catch (err) {
-    return {
-      plan: null,
-      debug: {
-        provider: config.provider,
+        apiKey: config.apiKey,
         model: config.model,
-        endpoint: config.endpoint,
-        status: 0,
-        ok: false,
-        used_fallback: true,
-        error: err instanceof Error ? err.message : "LLM orchestration failed.",
-        raw_chars: 0,
-      },
-    };
+        provider: config.provider,
+        messages: [
+          { role: "system", content: systemPrompt() },
+          { role: "user", content: buildPrompt(project, papers, protocols, feedback, agentProfile) },
+        ],
+      });
+
+      try {
+        const raw = extractJson(content);
+        const plan = normalizePlan(raw, project);
+        return {
+          plan,
+          debug: {
+            provider: config.provider,
+            model: config.model,
+            endpoint: config.endpoint,
+            status,
+            ok: true,
+            used_fallback: false,
+            error: null,
+            raw_chars: content.length,
+          },
+        };
+      } catch (parseError: any) {
+        // Repair attempt
+        try {
+          console.warn(`[LLM] JSON parse failed on ${config.model}. Attempting repair...`);
+          const { status: repairStatus, content: repairedContent } = await callChatCompletion({
+            endpoint: config.endpoint,
+            apiKey: config.apiKey,
+            model: config.model,
+            provider: config.provider,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are an expert JSON repair tool. You will be given a malformed JSON string. You must return ONLY the repaired, valid JSON without any prose, markdown formatting, or explanations.",
+              },
+              {
+                role: "user",
+                content: `Please repair this invalid JSON:\n\n${content}\n\nError: ${parseError.message}`,
+              },
+            ],
+          });
+          const raw = extractJson(repairedContent);
+          const plan = normalizePlan(raw, project);
+          return {
+            plan,
+            debug: {
+              provider: config.provider,
+              model: config.model,
+              endpoint: config.endpoint,
+              status: repairStatus,
+              ok: true,
+              used_fallback: false,
+              error: `JSON repaired after initial parse failure: ${parseError.message}`,
+              raw_chars: repairedContent.length,
+            },
+          };
+        } catch (repairError: any) {
+          lastError = `JSON Parse failed on ${config.model}: ${parseError.message}. Repair also failed: ${repairError.message}`;
+          console.warn(`[LLM] Repair failed on ${config.model}. Error: ${repairError.message}`);
+          continue; // Try next model in chain
+        }
+      }
+    } catch (httpError: any) {
+      lastError = `API Error on ${config.model}: ${httpError.message}`;
+      console.warn(`[LLM] Error on ${config.model}: ${httpError.message}`);
+      continue; // Try next model in chain
+    }
   }
+
+  return {
+    plan: null,
+    debug: {
+      provider: chain[0].provider,
+      model: chain[0].model,
+      endpoint: chain[0].endpoint,
+      status: 0,
+      ok: false,
+      used_fallback: true,
+      error: `All models in chain failed. Last error: ${lastError}`,
+      raw_chars: 0,
+    },
+  };
 }

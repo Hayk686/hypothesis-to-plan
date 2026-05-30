@@ -216,15 +216,19 @@ function ProjectPage() {
     ? {
         ...plan,
         materials: livePlan.materials_budget.items.map((m) => ({
-          item: m.name,
-          catalog: m.catalog,
-          supplier: m.supplier,
-          category: m.category as "equipment" | "consumable" | "reagent" | "service",
-          unitCost: m.unit_cost,
-          quantity: 1,
-          total: m.unit_cost,
+          name: m.name,
           purpose: m.note,
-          verified: m.verified,
+          vendor: m.supplier,
+          catalog: m.catalog,
+          quantity: "1",
+          unitCost: m.unit_cost,
+          total: m.unit_cost,
+          category: m.category as "equipment" | "consumable" | "reagent" | "service",
+          verification: {
+            status: (m.verified ? "verified" : "pending") as "verified" | "pending" | "unverified",
+            note: m.note,
+            sourceUrl: m.source_url,
+          },
         })),
         timeline: livePlan.timeline.map((t) => ({
           week: t.week,
@@ -237,11 +241,9 @@ function ProjectPage() {
           primaryMetric: livePlan.validation_plan.primary_metric,
           secondaryMetrics: livePlan.validation_plan.secondary_metrics,
           statisticalApproach: livePlan.validation_plan.statistical_approach,
-          controls: {
-            positive: livePlan.validation_plan.positive_control,
-            negative: livePlan.validation_plan.negative_control,
-          },
-          reproducibility: livePlan.validation_plan.reproducibility_checks,
+          positiveControl: livePlan.validation_plan.positive_control,
+          negativeControl: livePlan.validation_plan.negative_control,
+          reproducibilityChecks: livePlan.validation_plan.reproducibility_checks,
         },
       }
     : plan;

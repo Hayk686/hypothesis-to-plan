@@ -65,7 +65,6 @@ describe("Detailed Pipeline Verification: Soil Moisture Calibration", () => {
         budget_cap: project.budget,
         timeline_weeks: project.timelineWeeks,
         constraints: project.constraints,
-        source: "Live generation test",
       },
       papers: lit.data,
       protocols: proto.data,

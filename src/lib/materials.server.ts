@@ -31,6 +31,7 @@ export type MaterialSource =
   | "mouser"
   | "nexar"
   | "pubchem"
+  | "mock-biological-supplier"
   | "unverified";
 
 export type NormalizedMaterial = {
