@@ -244,6 +244,7 @@ function ProjectPage() {
           positiveControl: livePlan.validation_plan.positive_control,
           negativeControl: livePlan.validation_plan.negative_control,
           reproducibilityChecks: livePlan.validation_plan.reproducibility_checks,
+          source: plan.validation.source,
         },
       }
     : plan;

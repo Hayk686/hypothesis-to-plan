@@ -370,14 +370,12 @@ function normalizeTerms(input: ResolveInput): string[] {
   if (Array.isArray(input.protocol_steps)) {
     for (const step of input.protocol_steps) {
       if (typeof step === "string") {
-        push(step);
         addContext(step);
       } else if (step && typeof step === "object") {
         const s = step as { equipment?: unknown; materials?: unknown; description?: unknown };
         if (Array.isArray(s.equipment)) s.equipment.forEach(push);
         if (Array.isArray(s.materials)) s.materials.forEach(push);
         if (typeof s.description === "string") {
-          push(s.description);
           addContext(s.description);
         }
       }

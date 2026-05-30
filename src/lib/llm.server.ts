@@ -415,6 +415,22 @@ function normalizePlan(raw: unknown, project: LlmProjectInput): LlmPlan {
   };
 }
 
+function validatePlanSchema(plan: LlmPlan) {
+  if (plan.timeline.length === 0) {
+    throw new Error("schema validation failed: timeline is empty");
+  }
+  if (!plan.project_title || plan.project_title.trim().length === 0) {
+    throw new Error("schema validation failed: project_title is missing");
+  }
+  // Check for contamination in required_materials
+  const contaminated = plan.experimental_strategy.required_materials.some(
+    (m) => m.length > 100 || /steps preview|protocol|incubate|centrifuge/i.test(m)
+  );
+  if (contaminated) {
+    throw new Error("materials field contaminated with protocol text");
+  }
+}
+
 async function callChatCompletion({
   endpoint,
   apiKey,
@@ -517,6 +533,7 @@ export async function runLlmOrchestrator({
       try {
         const raw = extractJson(content);
         const plan = normalizePlan(raw, project);
+        validatePlanSchema(plan);
         return {
           plan,
           debug: {
@@ -553,6 +570,7 @@ export async function runLlmOrchestrator({
           });
           const raw = extractJson(repairedContent);
           const plan = normalizePlan(raw, project);
+          validatePlanSchema(plan);
           return {
             plan,
             debug: {
