@@ -518,8 +518,6 @@ export async function generatePlanLive(
     const feedbackCorrections = toLlmFeedbackCorrections(
       selectRelevantScientistFeedback(project, 6),
     );
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(new Error("Frontend timeout reached (120s) before backend responded.")), 120000);
     const res = await fetch("/api/generate-plan", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -537,9 +535,7 @@ export async function generatePlanLive(
           scientist_feedback: feedbackCorrections,
         },
       }),
-      signal: controller.signal,
     });
-    clearTimeout(timeoutId);
 
     if (!res.ok) {
       tick("error");

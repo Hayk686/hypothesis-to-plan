@@ -15,7 +15,6 @@ export type LlmConfig = {
 export type EnvConfig = {
   LLM_PROVIDER: "auto" | "nvidia" | "openrouter";
   LLM_FALLBACKS_ENABLED: boolean;
-  LLM_TIMEOUT_MS: number;
   LLM_JSON_REPAIR_ATTEMPTS: number;
 
   NVIDIA_API_KEY: string;
@@ -36,7 +35,6 @@ export function getEnvConfig(): EnvConfig {
   return {
     LLM_PROVIDER: provider,
     LLM_FALLBACKS_ENABLED: process.env.LLM_FALLBACKS_ENABLED !== "false",
-    LLM_TIMEOUT_MS: process.env.LLM_TIMEOUT_MS ? parseInt(process.env.LLM_TIMEOUT_MS, 10) : 55000,
     LLM_JSON_REPAIR_ATTEMPTS: process.env.LLM_JSON_REPAIR_ATTEMPTS
       ? parseInt(process.env.LLM_JSON_REPAIR_ATTEMPTS, 10)
       : 1,

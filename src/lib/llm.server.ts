@@ -385,14 +385,10 @@ async function callChatCompletion({
     headers["X-Title"] = env.OPENROUTER_APP_TITLE;
   }
 
-  const controller = new AbortController();
-  const timeoutMs = env.LLM_TIMEOUT_MS;
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(endpoint, {
       method: "POST",
       headers,
-      signal: controller.signal,
       body: JSON.stringify({
         model,
         messages,
@@ -412,8 +408,11 @@ async function callChatCompletion({
     const content = json.choices?.[0]?.message?.content;
     if (!content) throw new Error("LLM returned an empty message.");
     return { status, content };
-  } finally {
-    clearTimeout(timeoutId);
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error("LLM request was aborted");
+    }
+    throw err;
   }
 }
 
