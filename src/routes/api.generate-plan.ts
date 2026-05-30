@@ -370,6 +370,14 @@ export const Route = createFileRoute("/api/generate-plan")({
         });
         const materials: NormalizedMaterial[] = mat.data;
 
+        const unverifiedNames = materials.filter(m => !m.verified).map(m => m.name);
+        if (unverifiedNames.length > 0) {
+          console.warn("\n=== [MATERIALS DEBUG] UNVERIFIED ITEMS ===");
+          console.warn("These items failed to resolve in registry or external APIs:");
+          unverifiedNames.forEach(name => console.warn(` - ${name}`));
+          console.warn("==========================================\n");
+        }
+
         const litDebug: LiteratureDebug = lit.debug;
         const protoDebug: ProtocolDebug = proto.debug;
         const matDebug: ResolveDebug = mat.debug;
