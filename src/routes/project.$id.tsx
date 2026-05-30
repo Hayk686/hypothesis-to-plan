@@ -212,7 +212,45 @@ function ProjectPage() {
         reason: livePlan.source_status?.protocols?.reason,
       }
     : null;
-  const baseReadiness = computeLabReadiness(plan, plan.literatureQc, protocolLiveStatus);
+  const readinessPlan = livePlan
+    ? {
+        ...plan,
+        materials: livePlan.materials_budget.items.map((m) => ({
+          item: m.name,
+          catalog: m.catalog,
+          supplier: m.supplier,
+          category: m.category as "equipment" | "consumable" | "reagent" | "service",
+          unitCost: m.unit_cost,
+          quantity: 1,
+          total: m.unit_cost,
+          purpose: m.note,
+          verified: m.verified,
+        })),
+        timeline: livePlan.timeline.map((t) => ({
+          week: t.week,
+          phase: t.phase,
+          milestone: t.milestone,
+          tasks: t.tasks,
+          deliverable: t.deliverable,
+        })),
+        validation: {
+          primaryMetric: livePlan.validation_plan.primary_metric,
+          secondaryMetrics: livePlan.validation_plan.secondary_metrics,
+          statisticalApproach: livePlan.validation_plan.statistical_approach,
+          controls: {
+            positive: livePlan.validation_plan.positive_control,
+            negative: livePlan.validation_plan.negative_control,
+          },
+          reproducibility: livePlan.validation_plan.reproducibility_checks,
+        },
+      }
+    : plan;
+
+  const baseReadiness = computeLabReadiness(
+    readinessPlan,
+    livePlan ? livePlan.literature_qc : plan.literatureQc,
+    protocolLiveStatus,
+  );
   const hasMissingCatalogs = baseReadiness.missingChecklist.some((m) =>
     m.toLowerCase().includes("catalog number"),
   );
