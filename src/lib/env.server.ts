@@ -40,7 +40,7 @@ export function getEnvConfig(): EnvConfig {
       : 1,
 
     NVIDIA_API_KEY: (process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY || "").trim(),
-    NVIDIA_MODEL: process.env.NVIDIA_MODEL || "meta/llama-3.1-70b-instruct",
+    NVIDIA_MODEL: process.env.NVIDIA_MODEL || "meta/llama-3.1-8b-instruct",
     NVIDIA_BASE_URL: (process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1").replace(
       /\/$/,
       ""
