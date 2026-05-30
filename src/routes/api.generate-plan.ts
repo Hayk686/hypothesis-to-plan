@@ -571,7 +571,9 @@ export const Route = createFileRoute("/api/generate-plan")({
             ok: !usedFallback.protocols,
             coverage: usedFallback.protocols ? "partial" : "full",
             reason: usedFallback.protocols
-              ? `protocols.io HTTP ${protoStatusCode || "—"}${protoErrorMsg ? ` · ${protoErrorMsg}` : ""}`
+              ? protoStatusCode === 200
+                ? "protocols.io returned 0 results for this specific query."
+                : `protocols.io API error HTTP ${protoStatusCode || "—"}${protoErrorMsg ? ` · ${protoErrorMsg}` : ""}`
               : `${protocols.length} protocols from protocols.io.`,
           },
           materials: {
