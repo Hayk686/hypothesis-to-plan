@@ -455,7 +455,8 @@ async function callChatCompletion({
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutMs = process.env.LLM_TIMEOUT_MS ? parseInt(process.env.LLM_TIMEOUT_MS, 10) : 55000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(endpoint, {
       method: "POST",
@@ -549,46 +550,53 @@ export async function runLlmOrchestrator({
         };
       } catch (parseError: any) {
         // Repair attempt
-        try {
-          console.warn(`[LLM] JSON parse failed on ${config.model}. Attempting repair...`);
-          const { status: repairStatus, content: repairedContent } = await callChatCompletion({
-            endpoint: config.endpoint,
-            apiKey: config.apiKey,
-            model: config.model,
-            provider: config.provider,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are an expert JSON repair tool. You will be given a malformed JSON string. You must return ONLY the repaired, valid JSON without any prose, markdown formatting, or explanations.",
-              },
-              {
-                role: "user",
-                content: `Please repair this invalid JSON:\n\n${content}\n\nError: ${parseError.message}`,
-              },
-            ],
-          });
-          const raw = extractJson(repairedContent);
-          const plan = normalizePlan(raw, project);
-          validatePlanSchema(plan);
-          return {
-            plan,
-            debug: {
-              provider: config.provider,
-              model: config.model,
+        const maxRepairs = process.env.LLM_JSON_REPAIR_ATTEMPTS ? parseInt(process.env.LLM_JSON_REPAIR_ATTEMPTS, 10) : 1;
+        let currentError = parseError.message;
+        let lastContent = content;
+
+        for (let attempt = 1; attempt <= maxRepairs; attempt++) {
+          try {
+            console.warn(`[LLM] JSON parse/schema failed on ${config.model} (Attempt ${attempt}/${maxRepairs}). Attempting repair...`);
+            const { status: repairStatus, content: repairedContent } = await callChatCompletion({
               endpoint: config.endpoint,
-              status: repairStatus,
-              ok: true,
-              used_fallback: false,
-              error: `JSON repaired after initial parse failure: ${parseError.message}`,
-              raw_chars: repairedContent.length,
-            },
-          };
-        } catch (repairError: any) {
-          lastError = `JSON Parse failed on ${config.model}: ${parseError.message}. Repair also failed: ${repairError.message}`;
-          console.warn(`[LLM] Repair failed on ${config.model}. Error: ${repairError.message}`);
-          continue; // Try next model in chain
+              apiKey: config.apiKey,
+              model: config.model,
+              provider: config.provider,
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "You are an expert JSON repair tool. You will be given a malformed JSON string. You must return ONLY the repaired, valid JSON without any prose, markdown formatting, or explanations.",
+                },
+                {
+                  role: "user",
+                  content: `Please repair this invalid JSON:\n\n${lastContent}\n\nError: ${currentError}`,
+                },
+              ],
+            });
+            const raw = extractJson(repairedContent);
+            const plan = normalizePlan(raw, project);
+            validatePlanSchema(plan);
+            return {
+              plan,
+              debug: {
+                provider: config.provider,
+                model: config.model,
+                endpoint: config.endpoint,
+                status: repairStatus,
+                ok: true,
+                used_fallback: false,
+                error: `JSON repaired after parse/schema failure on attempt ${attempt}`,
+                raw_chars: repairedContent.length,
+              },
+            };
+          } catch (repairError: any) {
+            currentError = repairError.message;
+            lastError = `Repair attempt ${attempt} failed on ${config.model}: ${currentError}`;
+            console.warn(`[LLM] Repair attempt ${attempt} failed on ${config.model}. Error: ${currentError}`);
+          }
         }
+        continue; // Try next model in chain if all repairs fail
       }
     } catch (httpError: any) {
       lastError = `API Error on ${config.model}: ${httpError.message}`;
