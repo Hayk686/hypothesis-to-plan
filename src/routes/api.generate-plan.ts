@@ -347,7 +347,7 @@ export const Route = createFileRoute("/api/generate-plan")({
         const llmPlan: LlmPlan | null = llm.plan;
         const llmDebug: LlmDebug = llm.debug;
 
-        const llmRequiredMaterials = llmPlan?.experimental_strategy.required_materials ?? [];
+        const llmRequiredMaterials = llmPlan?.experimental_strategy?.required_materials ?? [];
         const explicitRequiredMaterials = Array.isArray(project.required_materials)
           ? project.required_materials.filter((m): m is string => typeof m === "string")
           : [];
@@ -365,7 +365,7 @@ export const Route = createFileRoute("/api/generate-plan")({
           required_materials,
           protocol_steps: protocols.map((p) => ({
             description: `${p.title}. ${p.description}`,
-            equipment: llmPlan?.experimental_strategy.required_materials ?? [],
+            equipment: llmPlan?.experimental_strategy?.required_materials ?? [],
           })),
         });
         const materials: NormalizedMaterial[] = mat.data;
@@ -490,11 +490,11 @@ export const Route = createFileRoute("/api/generate-plan")({
         );
 
         const fallback_scientist_review_questions = agentProfile.reviewQuestions;
-        let scientist_review_questions = llmPlan?.scientist_review_questions.length
+        let scientist_review_questions = llmPlan?.scientist_review_questions?.length
           ? llmPlan.scientist_review_questions
           : fallback_scientist_review_questions;
 
-        const timeline = llmPlan?.timeline.length
+        const timeline = llmPlan?.timeline?.length
           ? llmPlan.timeline
           : buildTimeline(weeks, agentProfile);
         if (scientistFeedback.length > 0) {
@@ -525,17 +525,17 @@ export const Route = createFileRoute("/api/generate-plan")({
             }
           }
         }
-        const risks = llmPlan?.risks.length ? llmPlan.risks : defaultRisks(agentProfile);
+        const risks = llmPlan?.risks?.length ? llmPlan.risks : defaultRisks(agentProfile);
         const judge_presentation_view = {
-          headline: llmPlan?.judge_presentation_view.headline ?? project_summary.title,
+          headline: llmPlan?.judge_presentation_view?.headline ?? project_summary.title,
           one_line_pitch:
-            llmPlan?.judge_presentation_view.one_line_pitch ??
+            llmPlan?.judge_presentation_view?.one_line_pitch ??
             (hypothesis.length > 220 ? `${hypothesis.slice(0, 217)}…` : hypothesis),
           evidence_strength:
-            llmPlan?.judge_presentation_view.evidence_strength ??
+            llmPlan?.judge_presentation_view?.evidence_strength ??
             (evidenceWeak ? "weak" : "adequate"),
           protocol_strategy:
-            llmPlan?.judge_presentation_view.protocol_strategy ??
+            llmPlan?.judge_presentation_view?.protocol_strategy ??
             "Adapt matched protocols under scientist review.",
           key_evidence: papers.slice(0, 3).map((p) => ({
             title: p.title,
