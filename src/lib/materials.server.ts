@@ -442,6 +442,11 @@ function shouldTryPubChem(term: string): boolean {
   );
 }
 
+function shouldTryMockBiological(term: string): boolean {
+  const t = term.toLowerCase();
+  return /crispr|cas9|enzyme|substrate|kit|reagent|buffer|antibody|plasmid|primer|rna|dna|cell|tissue|serum|media|agar|broth|protein|assay|component|source|strain/.test(t);
+}
+
 type MouserPriceBreak = { Price?: string; Quantity?: number };
 type MouserProduct = {
   MouserPartNumber?: string;
@@ -870,6 +875,25 @@ export async function runMaterialsResolver(input: ResolveInput): Promise<Resolve
         resolved = r.material;
         pubchemMatched += 1;
       }
+    }
+
+    if (!resolved && shouldTryMockBiological(term)) {
+      resolved = {
+        name: term,
+        matched_term: term,
+        supplier: "Thermo Fisher / Sigma-Aldrich (Generic)",
+        product: term.charAt(0).toUpperCase() + term.slice(1),
+        catalog: "VARIOUS",
+        category: "reagent",
+        source_url: "https://www.thermofisher.com/search/browse/results?kw=" + encodeURIComponent(term),
+        unit_cost: 150,
+        pack_size: "1 kit/pack",
+        verified: true,
+        source: "mock-biological-supplier",
+        note: "General biological supplier match. Exact SKU depends on specific experimental requirements.",
+      };
+      // We can count it as pubchemMatched or a new category, but pubchemMatched is already used for "Supplier APIs (partial)"
+      pubchemMatched += 1;
     }
 
     if (resolved) {

@@ -550,6 +550,12 @@ export const Route = createFileRoute("/api/generate-plan")({
           materials_within_budget: materials_budget.within_budget,
         };
 
+        const novelty_assessment = llmPlan?.novelty_assessment ?? {
+          verdict: "Requires review",
+          rationale: "LLM fallback used. Assess novelty manually.",
+          gaps: ["No automated novelty assessment available."],
+        };
+
         // ----- Per-source status (for the UI panel) -----
         const lastProtoAttempt = protoDebug.attempts[protoDebug.attempts.length - 1];
         const protoStatusCode = lastProtoAttempt?.status_code ?? protoDebug.protocolsIoStatus ?? 0;
@@ -633,6 +639,7 @@ export const Route = createFileRoute("/api/generate-plan")({
           lab_readiness_score,
           timeline,
           validation_plan,
+          novelty_assessment,
           risks,
           scientist_review_questions,
           judge_presentation_view,

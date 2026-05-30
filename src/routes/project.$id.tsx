@@ -710,107 +710,122 @@ function ProjectPage() {
 
           {/* NOVELTY */}
           <TabsContent value="novelty" className="mt-6 space-y-4">
-            <Card className="border-border/60 bg-gradient-card p-8 shadow-elegant">
-              <div className="flex flex-wrap items-center gap-8">
-                <div className="relative flex h-40 w-40 shrink-0 items-center justify-center">
-                  <svg className="absolute inset-0 -rotate-90" viewBox="0 0 100 100">
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="42"
-                      stroke="currentColor"
-                      strokeWidth="8"
-                      fill="none"
-                      className="text-muted"
-                    />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="42"
-                      stroke="url(#grad)"
-                      strokeWidth="8"
-                      fill="none"
-                      strokeDasharray={`${(plan.noveltyScore / 100) * 264} 264`}
-                      strokeLinecap="round"
-                    />
-                    <defs>
-                      <linearGradient id="grad" x1="0" x2="1" y1="0" y2="1">
-                        <stop offset="0%" stopColor="oklch(0.48 0.13 200)" />
-                        <stop offset="100%" stopColor="oklch(0.72 0.15 195)" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="text-center">
-                    <div className="font-display text-4xl font-bold text-primary">
-                      {plan.noveltyScore}
+            {(() => {
+              const liveNov = (livePlan as any)?.novelty_assessment;
+              const novScore = liveNov ? (liveNov.verdict === "High" ? 85 : liveNov.verdict === "Medium" ? 55 : 30) : plan.noveltyScore;
+              const novRationale = liveNov ? liveNov.rationale : plan.noveltyRationale;
+              const riskLevel = liveNov ? (liveNov.verdict === "High" ? "low" : "medium") : plan.noveltyAnalysis.riskLevel;
+              const whatIsKnown = liveNov ? ["Extracted from the live evidence map."] : plan.noveltyAnalysis.whatIsKnown;
+              const whatIsMissing = liveNov ? liveNov.gaps : plan.noveltyAnalysis.whatIsMissing;
+              const whyNovel = liveNov ? liveNov.rationale : plan.noveltyAnalysis.whyNovel;
+              const refinement = liveNov ? "Automatically generated plans currently do not include further refinements." : plan.noveltyAnalysis.refinement;
+
+              return (
+                <>
+                  <Card className="border-border/60 bg-gradient-card p-8 shadow-elegant">
+                    <div className="flex flex-wrap items-center gap-8">
+                      <div className="relative flex h-40 w-40 shrink-0 items-center justify-center">
+                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 100 100">
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="42"
+                            stroke="currentColor"
+                            strokeWidth="8"
+                            fill="none"
+                            className="text-muted"
+                          />
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="42"
+                            stroke="url(#grad)"
+                            strokeWidth="8"
+                            fill="none"
+                            strokeDasharray={`${(novScore / 100) * 264} 264`}
+                            strokeLinecap="round"
+                          />
+                          <defs>
+                            <linearGradient id="grad" x1="0" x2="1" y1="0" y2="1">
+                              <stop offset="0%" stopColor="oklch(0.48 0.13 200)" />
+                              <stop offset="100%" stopColor="oklch(0.72 0.15 195)" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+                        <div className="text-center">
+                          <div className="font-display text-4xl font-bold text-primary">
+                            {novScore}
+                          </div>
+                          <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                            Novelty
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="mb-2 flex items-center gap-2">
+                          <h3 className="font-display text-xl font-semibold">Why this score?</h3>
+                          <RiskLevelBadge level={riskLevel} label="Novelty risk" />
+                        </div>
+                        <p className="mt-1 text-muted-foreground">{novRationale}</p>
+                      </div>
                     </div>
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                      Novelty
+                  </Card>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Card className="border-border/60 bg-gradient-card p-6">
+                      <div className="mb-3 flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-success" />
+                        <h3 className="font-display text-base font-semibold">What is already known</h3>
+                      </div>
+                      <ul className="space-y-2 text-sm">
+                        {whatIsKnown.map((k: string, i: number) => (
+                          <li key={i} className="flex gap-2">
+                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-success" />
+                            <span className="text-foreground/80">{k}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </Card>
+                    <Card className="border-border/60 bg-gradient-card p-6">
+                      <div className="mb-3 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-warning-foreground" />
+                        <h3 className="font-display text-base font-semibold">
+                          What is missing in the literature
+                        </h3>
+                      </div>
+                      <ul className="space-y-2 text-sm">
+                        {whatIsMissing.map((k: string, i: number) => (
+                          <li key={i} className="flex gap-2">
+                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-warning" />
+                            <span className="text-foreground/80">{k}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </Card>
+                  </div>
+
+                  <Card className="border-border/60 bg-gradient-card p-6">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <h3 className="font-display text-base font-semibold">
+                        Why this hypothesis may be novel
+                      </h3>
                     </div>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <div className="mb-2 flex items-center gap-2">
-                    <h3 className="font-display text-xl font-semibold">Why this score?</h3>
-                    <RiskLevelBadge level={plan.noveltyAnalysis.riskLevel} label="Novelty risk" />
-                  </div>
-                  <p className="mt-1 text-muted-foreground">{plan.noveltyRationale}</p>
-                </div>
-              </div>
-            </Card>
+                    <p className="text-foreground/80">{whyNovel}</p>
+                  </Card>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card className="border-border/60 bg-gradient-card p-6">
-                <div className="mb-3 flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-success" />
-                  <h3 className="font-display text-base font-semibold">What is already known</h3>
-                </div>
-                <ul className="space-y-2 text-sm">
-                  {plan.noveltyAnalysis.whatIsKnown.map((k, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-success" />
-                      <span className="text-foreground/80">{k}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-              <Card className="border-border/60 bg-gradient-card p-6">
-                <div className="mb-3 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-warning-foreground" />
-                  <h3 className="font-display text-base font-semibold">
-                    What is missing in the literature
-                  </h3>
-                </div>
-                <ul className="space-y-2 text-sm">
-                  {plan.noveltyAnalysis.whatIsMissing.map((k, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-warning" />
-                      <span className="text-foreground/80">{k}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </div>
-
-            <Card className="border-border/60 bg-gradient-card p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <h3 className="font-display text-base font-semibold">
-                  Why this hypothesis may be novel
-                </h3>
-              </div>
-              <p className="text-foreground/80">{plan.noveltyAnalysis.whyNovel}</p>
-            </Card>
-
-            <Card className="border-primary/30 bg-primary/5 p-6">
-              <div className="mb-2 flex items-center gap-2">
-                <Target className="h-4 w-4 text-primary" />
-                <h3 className="font-display text-base font-semibold text-primary">
-                  Recommended refinement
-                </h3>
-              </div>
-              <p className="text-foreground/85">{plan.noveltyAnalysis.refinement}</p>
-            </Card>
+                  <Card className="border-primary/30 bg-primary/5 p-6">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Target className="h-4 w-4 text-primary" />
+                      <h3 className="font-display text-base font-semibold text-primary">
+                        Recommended refinement
+                      </h3>
+                    </div>
+                    <p className="text-foreground/85">{refinement}</p>
+                  </Card>
+                </>
+              );
+            })()}
           </TabsContent>
 
           {/* PROTOCOL */}
