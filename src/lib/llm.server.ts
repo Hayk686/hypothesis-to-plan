@@ -2,6 +2,7 @@ import type { NormalizedPaper } from "@/lib/literature.server";
 import type { NormalizedProtocol } from "@/lib/protocols.server";
 import type { LlmFeedbackCorrection } from "@/lib/scientistFeedback";
 import { buildAgentProfile, type AgentProfile } from "@/lib/agentProfile.server";
+import { buildLlmChain, getEnvConfig, type LlmConfig } from "@/lib/env.server";
 
 export type LlmProvider = "openrouter" | "nvidia" | "none";
 
@@ -88,78 +89,7 @@ type ChatCompletionResponse = {
   choices?: Array<{ message?: { content?: string | null } }>;
 };
 
-const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
-const NVIDIA_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
-
-type ProviderMode = "auto" | "nvidia" | "openrouter";
-
-function getProviderMode(): ProviderMode {
-  const raw = (process.env.LLM_PROVIDER ?? "").trim().toLowerCase();
-  if (raw === "nvidia" || raw === "openrouter") return raw;
-  return "auto";
-}
-
-function fallbacksEnabled(): boolean {
-  return process.env.LLM_FALLBACKS_ENABLED !== "false";
-}
-
-function hasNvidiaKey(): boolean {
-  return Boolean(process.env.NVIDIA_API_KEY || process.env.NVIDIA_NIM_API_KEY);
-}
-
-function hasOpenRouterKey(): boolean {
-  return Boolean(process.env.OPENROUTER_API_KEY);
-}
-
-export type LlmConfig = {
-  provider: "openrouter" | "nvidia";
-  apiKey: string;
-  endpoint: string;
-  model: string;
-};
-
-function getLlmChain(): LlmConfig[] {
-  const mode = getProviderMode();
-  const allowFallbacks = fallbacksEnabled();
-
-  const nvidiaKey = process.env.NVIDIA_API_KEY ?? process.env.NVIDIA_NIM_API_KEY ?? "";
-  const openRouterKey = process.env.OPENROUTER_API_KEY ?? "";
-
-  const nvidia: LlmConfig = {
-    provider: "nvidia" as const,
-    apiKey: nvidiaKey,
-    endpoint: `${(process.env.NVIDIA_BASE_URL ?? "https://integrate.api.nvidia.com/v1").replace(/\/$/, "")}/chat/completions`,
-    model: process.env.NVIDIA_MODEL || "z-ai/glm-5.1",
-  };
-
-  const openrouter: LlmConfig = {
-    provider: "openrouter" as const,
-    apiKey: openRouterKey,
-    endpoint: process.env.OPENROUTER_BASE_URL ?? OPENROUTER_ENDPOINT,
-    model: process.env.OPENROUTER_MODEL || "openai/gpt-oss-120b:free",
-  };
-
-  let chain: LlmConfig[] = [];
-  if (mode === "nvidia") {
-    chain = [nvidia, openrouter];
-  } else if (mode === "openrouter") {
-    chain = [openrouter, nvidia];
-  } else {
-    // auto
-    chain = hasNvidiaKey() ? [nvidia, openrouter] : [openrouter, nvidia];
-  }
-
-  if (!allowFallbacks) {
-    chain = chain.slice(0, 1);
-  }
-
-  return chain.filter((item) => {
-    if (item.provider === "nvidia") return hasNvidiaKey();
-    if (item.provider === "openrouter") return hasOpenRouterKey();
-    return false;
-  });
-}
-
+// Removed env logic to env.server.ts
 function buildPrompt(
   project: LlmProjectInput,
   papers: NormalizedPaper[],
@@ -444,18 +374,19 @@ async function callChatCompletion({
   provider: "openrouter" | "nvidia";
   messages: ChatMessage[];
 }) {
+  const env = getEnvConfig();
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
     Accept: "application/json",
   };
   if (provider === "openrouter") {
-    headers["HTTP-Referer"] = process.env.OPENROUTER_SITE_URL ?? "http://localhost:5173";
-    headers["X-Title"] = process.env.OPENROUTER_APP_TITLE ?? "Hypothesis to Plan";
+    headers["HTTP-Referer"] = env.OPENROUTER_SITE_URL;
+    headers["X-Title"] = env.OPENROUTER_APP_TITLE;
   }
 
   const controller = new AbortController();
-  const timeoutMs = process.env.LLM_TIMEOUT_MS ? parseInt(process.env.LLM_TIMEOUT_MS, 10) : 55000;
+  const timeoutMs = env.LLM_TIMEOUT_MS;
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(endpoint, {
@@ -497,7 +428,8 @@ export async function runLlmOrchestrator({
   protocols: NormalizedProtocol[];
   feedback?: LlmFeedbackCorrection[];
 }): Promise<LlmResult> {
-  const chain = getLlmChain();
+  const env = getEnvConfig();
+  const chain = buildLlmChain();
   const agentProfile = buildAgentProfile(project);
 
   if (chain.length === 0) {
@@ -550,7 +482,7 @@ export async function runLlmOrchestrator({
         };
       } catch (parseError: any) {
         // Repair attempt
-        const maxRepairs = process.env.LLM_JSON_REPAIR_ATTEMPTS ? parseInt(process.env.LLM_JSON_REPAIR_ATTEMPTS, 10) : 1;
+        const maxRepairs = env.LLM_JSON_REPAIR_ATTEMPTS;
         let currentError = parseError.message;
         let lastContent = content;
 
